@@ -2,7 +2,7 @@ import asyncio
 import logging
 import sys
 from aiogram import Dispatcher, Bot
-from aiogram.types import Message, InlineKeyboardButton, CallbackQuery
+from aiogram.types import Message, InlineKeyboardButton, CallbackQuery, InputFile
 from aiogram.filters import CommandStart
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
@@ -48,16 +48,14 @@ async def callback_main(query: CallbackQuery):
     await start_command(query.message)
 
 
-@dp.callback_query()
-async def fallback(query: CallbackQuery):
-    print(query)
+@dp.message()
+async def fallback(message: Message):
+    # это file_id
+    await message.reply_photo('AgACAgIAAxkBAAOwZflSPEbH3RU7-ieNFT44JQcO0_AAAmvVMRsNftBLPn1wBNvI-soBAAMCAANzAAM0BA')
 
 async def main():
     await dp.start_polling(bot)
 
-
-
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO, stream=sys.stdout)
     asyncio.run(main())
-    
