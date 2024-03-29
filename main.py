@@ -1,10 +1,12 @@
 import asyncio
 import logging
+import os
 import sys
-from aiogram import Dispatcher, Bot
-from aiogram.types import Message, InlineKeyboardButton, CallbackQuery, ChatMemberAdministrator
+from aiogram import Bot, Dispatcher, types, F
+from aiogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery, ChatMemberAdministrator, \
+    InputFile
 from aiogram.enums import ChatMemberStatus
-from aiogram.filters import CommandStart
+from aiogram.filters import CommandStart, Command, Filter
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.exceptions import TelegramForbiddenError
 
@@ -12,6 +14,7 @@ from aiogram.exceptions import TelegramForbiddenError
 from config import TELEGRAM_TOKEN
 
 states = {}
+dict_for_messages = {}
 dp = Dispatcher()
 bot = Bot(TELEGRAM_TOKEN)
 
@@ -72,8 +75,59 @@ async def adding_channel_forward(message: Message):
     if len(client) == 0:
         await message.answer(text='Ты не админ 😒', reply_markup=keyboard.as_markup())
         return
-    await message.answer(text='TODO сделать какую нибудь связь, типо бд', reply_markup=keyboard.as_markup())
+    # await message.answer(text='TODO сделать какую нибудь связь, типо бд', reply_markup=keyboard.as_markup())
 
+# функция для показа текущего поста
+@dp.message(Command('preview'))
+async def show_current_post(message: types.Message):
+    if dict_for_messages['photo']:
+        # photo = open('temp.png', 'rb')
+        await bot.download(dict_for_messages['photo'].file_id, 'temp.png')
+        # change
+        await message.answer_photo(photo=open('temp.png', 'rb'), caption=dict_for_messages['text'])
+        os.remove('temp.png')
+    else:
+        await message.answer(text=dict_for_messages['text'])
+
+
+# Обработчик текстовых сообщений
+@dp.message(F.text)
+async def handle_text(message: types.Message):
+    dict_for_messages['text'] = message.text
+    # Здесь можно добавить логику для сохранения текста и предварительного просмотра
+    await message.reply("Текст получен. Отправьте медиафайлы.")
+
+# Обработчик медиафайлов
+@dp.message(F.photo)
+async def handle_media(message: types.Message):
+    dict_for_messages['photo'] = message.photo[2]
+    print(dict_for_messages['photo'])
+    # Здесь можно добавить логику для сохранения медиафайлов и предварительного просмотра
+    await message.reply("Медиафайл получен. Готов к публикации.")
+
+# Функция для публикации поста
+async def publish_post(text, media):
+    # Здесь реализуйте логику публикации поста в канал
+    pass
+
+# Обработчик команды /publish
+@dp.message(Command('publish'))
+async def publish_command(message: types.Message):
+    # Здесь можно добавить логику для публикации сохранённого поста
+    await message.reply("Пост опубликован.")
+
+# # Добавление кнопки к посту
+# def add_button(text):
+#     keyboard = InlineKeyboardMarkup()
+#     button = InlineKeyboardButton(text="Нажми", callback_data="button_pressed")
+#     keyboard.add(button)
+#     return keyboard
+#
+# # Обработчик callback-запросов
+# @dp.callback_query_handler(lambda c: c.data == "button_pressed")
+# async def process_callback_button1(callback_query: types.CallbackQuery):
+#     await bot.answer_callback_query(callback_query.id)
+#     await bot.send_message(callback_query.from_user.id, "Кнопка нажата!")
 
 async def main():
     await dp.start_polling(bot)
