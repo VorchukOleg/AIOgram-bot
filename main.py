@@ -4,11 +4,12 @@ import os
 import sys
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery, ChatMemberAdministrator, \
-    InputFile, Chat
+    InputFile, Chat, FSInputFile
 from aiogram.enums import ChatMemberStatus
 from aiogram.filters import CommandStart, Command, Filter
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.exceptions import TelegramForbiddenError, TelegramBadRequest
+from aiogram.methods import SendPhoto
 
 
 from config import TELEGRAM_TOKEN
@@ -103,11 +104,7 @@ async def adding_channel_forward(message: Message):
 @dp.message(Command('preview'))
 async def show_current_post(message: types.Message):
     if dict_for_messages['photo']:
-        # photo = open('temp.png', 'rb')
-        await bot.download(dict_for_messages['photo'].file_id, 'temp.png')
-        # change
-        await message.answer_photo(photo=open('temp.png', 'rb'), caption=dict_for_messages['text'])
-        os.remove('temp.png')
+        await bot(SendPhoto(chat_id=message.chat.id, photo=dict_for_messages['photo'], caption=dict_for_messages['text']))
     else:
         await message.answer(text=dict_for_messages['text'])
 
@@ -127,7 +124,7 @@ async def handle_text(message: types.Message):
 # Обработчик медиафайлов
 @dp.message(F.photo)
 async def handle_media(message: types.Message):
-    dict_for_messages['photo'] = message.photo[2]
+    dict_for_messages['photo'] = message.photo[2].file_id
     print(dict_for_messages['photo'])
     # Здесь можно добавить логику для сохранения медиафайлов и предварительного просмотра
     await message.reply("Медиафайл получен. Готов к публикации.")
@@ -135,6 +132,7 @@ async def handle_media(message: types.Message):
 # Функция для публикации поста
 async def publish_post(text, media):
     # Здесь реализуйте логику публикации поста в канал
+
     pass
 
 # # Добавление кнопки к посту
