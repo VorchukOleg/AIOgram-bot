@@ -13,27 +13,32 @@ from aiogram.exceptions import TelegramForbiddenError, TelegramBadRequest
 
 from config import TELEGRAM_TOKEN
 
+# Словарь состояние... Это состаяние в котором бот находится бот для каждого пользователи поотдельности
 states = {}
+# Может dict_for_messages объединить с states - фактически у них общая задача - хранить значение общение с ботом
 dict_for_messages = {}
 dp = Dispatcher()
 bot = Bot(TELEGRAM_TOKEN)
 
+# Функция для создание фильтр (для фитрации данных callback запросов)
 def clbk_filter(data: str):
     def check(x: CallbackQuery):
         return x.data == data
     return check
 
+# Функция которая запускается при Старте
 @dp.message(CommandStart())
 async def start_command(message: Message):
     keyboard = InlineKeyboardBuilder()
     keyboard = keyboard.add(InlineKeyboardButton(text='✍️ Каналы', callback_data='channels'))
     text = '💻 Привет'
+    # Условие необходимое для проверки, это сообщение бота или человека (т.к. данная функция вызывается и тут и через callback_main)
     if message.from_user.id == bot.id:
         await message.edit_text(text, reply_markup=keyboard.as_markup())
     else:
         await message.answer(text, reply_markup=keyboard.as_markup())
 
-
+# Функция при нажатие кнопки (при получение callback query если в нём query.data == 'channels')
 @dp.callback_query(clbk_filter('channels'))
 async def start_channels_callback(query: CallbackQuery):
     keyboard = InlineKeyboardBuilder()
@@ -41,6 +46,7 @@ async def start_channels_callback(query: CallbackQuery):
     keyboard = keyboard.row(InlineKeyboardButton(text='➕ Добавить канал', callback_data='add_channel'), InlineKeyboardButton(text='↩️ На главную', callback_data='main'))
     await query.message.edit_text(text='💻 Выберите канал', reply_markup=keyboard.as_markup())
 
+# Функция при нажатие кнопки (при получение callback query если в нём query.data == 'add_channel')
 @dp.callback_query(clbk_filter('add_channel'))
 async def add_channel(query: CallbackQuery):
     states[query.from_user.id] = {
@@ -50,17 +56,22 @@ async def add_channel(query: CallbackQuery):
     keyboard = keyboard.row(InlineKeyboardButton(text='Отмена', callback_data='channels'))
     await query.message.edit_text(text='➕ Добавление канала\n\n1) Добавьте меня в канал\n2) Перешлите суда одно сообщение из канала', reply_markup=keyboard.as_markup())
 
+# Функция при нажатие кнопки (при получение callback query если в нём query.data == 'main')
 @dp.callback_query(clbk_filter('main'))
 async def callback_main(query: CallbackQuery): 
     await start_command(query.message)
 
-
+# Это достаточно сложный фильтр которые занимается подменю... (см на ф-ию adding_channel_forward)
 def adding_channel_filter():
     def check(x: Message):
         print(x.chat.id == x.from_user.id and x.forward_from_chat is not None,  x.from_user.id in states and states[x.from_user.id]['state'] == 'adding_channel')
         return x.chat.id == x.from_user.id and x.forward_from_chat is not None and x.from_user.id in states and states[x.from_user.id]['state'] == 'adding_channel'
     return check
 
+# Ф-ия проверяет ли человек (в основном кто пишет боту) имеет права писать в канал
+# Возвращает 0 - что вообще бот не в канале или не имеет право узнать список админов
+# Возвращает 1 - он в канале, но сам человек не админ
+# Возвращает 2 - он в канале, и он админ
 async def is_user_admin(user_id: int, chat: Chat) -> int:
     admins: list[ChatMemberAdministrator] = []
     try:
@@ -74,7 +85,7 @@ async def is_user_admin(user_id: int, chat: Chat) -> int:
         return 1
     return 2
     
-
+# По моей идеи, можно будет к боту привязыватся тг каналы, и для этого нужно подменю
 @dp.message(adding_channel_filter())
 async def adding_channel_forward(message: Message):
     keyboard = InlineKeyboardBuilder()
