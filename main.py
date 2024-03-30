@@ -111,6 +111,11 @@ async def show_current_post(message: types.Message):
     else:
         await message.answer(text=dict_for_messages['text'])
 
+# Обработчик команды /publish
+@dp.message(Command('publish'))
+async def publish_command(message: types.Message):
+    # Здесь можно добавить логику для публикации сохранённого поста
+    await message.reply("Пост опубликован.")
 
 # Обработчик текстовых сообщений
 @dp.message(F.text)
@@ -131,12 +136,6 @@ async def handle_media(message: types.Message):
 async def publish_post(text, media):
     # Здесь реализуйте логику публикации поста в канал
     pass
-
-# Обработчик команды /publish
-@dp.message(Command('publish'))
-async def publish_command(message: types.Message):
-    # Здесь можно добавить логику для публикации сохранённого поста
-    await message.reply("Пост опубликован.")
 
 # # Добавление кнопки к посту
 # def add_button(text):
