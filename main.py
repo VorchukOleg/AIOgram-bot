@@ -4,11 +4,11 @@ import os
 import sys
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery, ChatMemberAdministrator, \
-    InputFile
+    InputFile, Chat
 from aiogram.enums import ChatMemberStatus
 from aiogram.filters import CommandStart, Command, Filter
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-from aiogram.exceptions import TelegramForbiddenError
+from aiogram.exceptions import TelegramForbiddenError, TelegramBadRequest
 
 
 from config import TELEGRAM_TOKEN
@@ -57,25 +57,36 @@ async def callback_main(query: CallbackQuery):
 
 def adding_channel_filter():
     def check(x: Message):
+        print(x.chat.id == x.from_user.id and x.forward_from_chat is not None,  x.from_user.id in states and states[x.from_user.id]['state'] == 'adding_channel')
         return x.chat.id == x.from_user.id and x.forward_from_chat is not None and x.from_user.id in states and states[x.from_user.id]['state'] == 'adding_channel'
     return check
+
+async def is_user_admin(user_id: int, chat: Chat) -> int:
+    admins: list[ChatMemberAdministrator] = []
+    try:
+        admins = await chat.get_administrators()
+    except TelegramForbiddenError as err:
+        return 0
+    except TelegramBadRequest as err:
+        return 0
+    client = set(filter(lambda x: x.user.id == user_id and (x.status == ChatMemberStatus.CREATOR or x.can_post_messages), admins))
+    if len(client) == 0:
+        return 1
+    return 2
+    
 
 @dp.message(adding_channel_filter())
 async def adding_channel_forward(message: Message):
     keyboard = InlineKeyboardBuilder()
     keyboard = keyboard.row(InlineKeyboardButton(text='Отмена', callback_data='channels'))
-
-    admins: list[ChatMemberAdministrator] = []
-    try:
-        admins = await message.forward_from_chat.get_administrators()
-    except TelegramForbiddenError as err:
+    status = await is_user_admin(message.from_user.id, message.forward_from_chat)
+    if status == 0:
         await message.answer(text='Я не участник данного канала 😒', reply_markup=keyboard.as_markup())
-        return
-    client = set(filter(lambda x: x.user.id == message.from_user.id and (x.status == ChatMemberStatus.CREATOR or x.can_post_messages), admins))
-    if len(client) == 0:
+    elif status == 1:
         await message.answer(text='Ты не админ 😒', reply_markup=keyboard.as_markup())
-        return
-    # await message.answer(text='TODO сделать какую нибудь связь, типо бд', reply_markup=keyboard.as_markup())
+    else:
+        pass
+        # await message.answer(text='TODO сделать какую нибудь связь, типо бд', reply_markup=keyboard.as_markup())
 
 # функция для показа текущего поста
 @dp.message(Command('preview'))
