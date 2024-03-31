@@ -1,5 +1,5 @@
 from globals import *
-from aiogram.types import CallbackQuery, ChatMemberAdministrator, Chat
+from aiogram.types import CallbackQuery, ChatMemberAdministrator, Chat, Message
 from aiogram.exceptions import TelegramForbiddenError, TelegramBadRequest
 from aiogram.enums import ChatMemberStatus
 
@@ -25,3 +25,19 @@ async def is_user_admin(user_id: int, chat: Chat) -> int:
     if len(client) == 0:
         return 1
     return 2
+
+def get_user_id(c: CallbackQuery | Message) -> int:
+    user_id: int
+    if isinstance(c, CallbackQuery):
+        user_id = c.from_user.id
+    else:
+        user_id = c.chat.id
+    return user_id
+
+async def answer(c: CallbackQuery | Message, *args, **kwargs):
+    if isinstance(c, CallbackQuery):
+        await c.message.edit_text(*args, **kwargs)
+    elif c.from_user.id == bot.id:
+        await c.edit_text(*args, **kwargs)
+    else:
+        await c.answer(*args, **kwargs)

@@ -2,14 +2,14 @@ import asyncio
 import logging
 import sys
 from aiogram import F
-from aiogram.types import Message, InlineKeyboardButton, KeyboardButton, CallbackQuery
+from aiogram.types import Message, InlineKeyboardButton, CallbackQuery
 from aiogram.filters import CommandStart, Command
-from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardBuilder
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram import F
 
 from globals import *
 from database import link_chat_to_user, get_links_of_user, is_linked
-from utils import clbk_filter, is_user_admin
+from utils import clbk_filter, is_user_admin, get_user_id, answer
 
 # Словарь состояние... Это состаяние в котором бот находится бот для каждого пользователи поотдельности
 states = {}
@@ -24,11 +24,7 @@ async def start_command(message: Message):
     text = '💻 Привет'
     if message.chat.id in states:
         del states[message.chat.from_user.id]
-    # Условие необходимое для проверки, это сообщение бота или человека (т.к. данная функция вызывается и тут и через callback_main)
-    if message.from_user.id == bot.id:
-        await message.edit_text(text, reply_markup=keyboard.as_markup())
-    else:
-        await message.answer(text, reply_markup=keyboard.as_markup())
+    await answer(message, text=text, reply_markup=keyboard.as_markup())
 
 # Функция при нажатие кнопки (при получение callback query если в нём query.data == 'channels')
 @dp.callback_query(clbk_filter('channels'))
@@ -40,11 +36,7 @@ async def channels_callback(query: CallbackQuery):
     await query.message.edit_text(text='💻 Выберите канал', reply_markup=keyboard.as_markup())
 
 async def channel_menu(c: CallbackQuery | Message, chat_id: int | None = None):
-    user_id: int
-    if isinstance(c, CallbackQuery):
-        user_id = c.from_user.id
-    else:
-        user_id = c.chat.id
+    user_id = get_user_id(c)
     states[user_id] = {
         'state': 'channel',
         'chat_id': chat_id or states[user_id]['chat_id']
@@ -53,11 +45,7 @@ async def channel_menu(c: CallbackQuery | Message, chat_id: int | None = None):
     keyboard = InlineKeyboardBuilder()
     keyboard = keyboard.row(InlineKeyboardButton(text='✍️ Написать новый пост', callback_data='write_post'))
     keyboard = keyboard.row(InlineKeyboardButton(text='✍️ Каналы', callback_data='channels'))
-    text = '💻 Канал: ' + chat.full_name + '\n\nЧто вы хотите сделать?'
-    if isinstance(c, CallbackQuery):
-        await c.message.edit_text(text=text, reply_markup=keyboard.as_markup())
-    else:
-        await c.answer(text=text, reply_markup=keyboard.as_markup())
+    await answer(c, text='💻 Канал: ' + chat.full_name + '\n\nЧто вы хотите сделать?', reply_markup=keyboard.as_markup())
 
 
 # Функция управление привязанным каналом
