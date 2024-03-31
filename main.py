@@ -1,31 +1,20 @@
 import asyncio
 import logging
-import os
 import sys
-from aiogram import Bot, Dispatcher, types, F
-from aiogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery, ChatMemberAdministrator, \
-    InputFile, Chat, FSInputFile
-from aiogram.enums import ChatMemberStatus
-from aiogram.filters import CommandStart, Command, Filter
+from aiogram import F
+from aiogram.types import Message, InlineKeyboardButton, CallbackQuery
+from aiogram.filters import CommandStart, Command
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-from aiogram.exceptions import TelegramForbiddenError, TelegramBadRequest
-from aiogram.methods import SendPhoto
+from aiogram import F
 
-
-from config import TELEGRAM_TOKEN
+from globals import *
+from database import link_chat_to_user, get_links_of_user, is_linked
+from utils import clbk_filter, is_user_admin
 
 # Словарь состояние... Это состаяние в котором бот находится бот для каждого пользователи поотдельности
 states = {}
 # Может dict_for_messages объединить с states - фактически у них общая задача - хранить значение общение с ботом
 dict_for_messages = {}
-dp = Dispatcher()
-bot = Bot(TELEGRAM_TOKEN)
-
-# Функция для создание фильтр (для фитрации данных callback запросов)
-def clbk_filter(data: str):
-    def check(x: CallbackQuery):
-        return x.data == data
-    return check
 
 # Функция которая запускается при Старте
 @dp.message(CommandStart())
@@ -41,11 +30,30 @@ async def start_command(message: Message):
 
 # Функция при нажатие кнопки (при получение callback query если в нём query.data == 'channels')
 @dp.callback_query(clbk_filter('channels'))
-async def start_channels_callback(query: CallbackQuery):
+async def channels_callback(query: CallbackQuery):
     keyboard = InlineKeyboardBuilder()
-    # keyboard = keyboard.row(InlineKeyboardButton(text='Канал', callback_data='channels'))
+    for linkedChat in await get_links_of_user(query.from_user.id):
+        keyboard = keyboard.row(InlineKeyboardButton(text=linkedChat.full_name, callback_data='channel_' + str(linkedChat.id)))
     keyboard = keyboard.row(InlineKeyboardButton(text='➕ Добавить канал', callback_data='add_channel'), InlineKeyboardButton(text='↩️ На главную', callback_data='main'))
     await query.message.edit_text(text='💻 Выберите канал', reply_markup=keyboard.as_markup())
+
+# Функция управление привязанным каналом
+@dp.callback_query(lambda x: x.data.startswith('channel_'))
+async def channel_open_callback(query: CallbackQuery):
+    chat = await is_linked(query.from_user.id, int(query.data[len('channel_'):]))
+    keyboard = InlineKeyboardBuilder()
+    if chat is None:
+        keyboard = keyboard.row(InlineKeyboardButton(text='✍️ Каналы', callback_data='channels'))
+        await query.message.edit_text(text='❌ Нет доступа', reply_markup=keyboard.as_markup())
+        return
+    states[query.from_user.id] = {
+        'state': 'channel',
+        'chat_id': chat.id
+    }
+    keyboard = keyboard.row(InlineKeyboardButton(text='✍️ Написать новый пост', callback_data='write_post'))
+    keyboard = keyboard.row(InlineKeyboardButton(text='✍️ Каналы', callback_data='channels'))
+    await query.message.edit_text(text='💻 Канал: ' + chat.full_name + '\n\nЧто вы хотите сделать?', reply_markup=keyboard.as_markup())
+
 
 # Функция при нажатие кнопки (при получение callback query если в нём query.data == 'add_channel')
 @dp.callback_query(clbk_filter('add_channel'))
@@ -67,41 +75,24 @@ def adding_channel_filter():
     def check(x: Message):
         return x.chat.id == x.from_user.id and x.forward_from_chat is not None and x.from_user.id in states and states[x.from_user.id]['state'] == 'adding_channel'
     return check
-
-# Ф-ия проверяет ли человек (в основном кто пишет боту) имеет права писать в канал
-# Возвращает 0 - что вообще бот не в канале или не имеет право узнать список админов
-# Возвращает 1 - он в канале, но сам человек не админ
-# Возвращает 2 - он в канале, и он админ
-async def is_user_admin(user_id: int, chat: Chat) -> int:
-    admins: list[ChatMemberAdministrator] = []
-    try:
-        admins = await chat.get_administrators()
-    except TelegramForbiddenError as err:
-        return 0
-    except TelegramBadRequest as err:
-        return 0
-    client = set(filter(lambda x: x.user.id == user_id and (x.status == ChatMemberStatus.CREATOR or x.can_post_messages), admins))
-    if len(client) == 0:
-        return 1
-    return 2
     
 # По моей идеи, можно будет к боту привязыватся тг каналы, и для этого нужно подменю
 @dp.message(adding_channel_filter())
 async def adding_channel_forward(message: Message):
     keyboard = InlineKeyboardBuilder()
-    keyboard = keyboard.row(InlineKeyboardButton(text='Отмена', callback_data='channels'))
+    keyboard = keyboard.row(InlineKeyboardButton(text='В меню', callback_data='channels'))
     status = await is_user_admin(message.from_user.id, message.forward_from_chat)
     if status == 0:
         await message.answer(text='Я не участник данного канала 😒', reply_markup=keyboard.as_markup())
     elif status == 1:
         await message.answer(text='Ты не админ 😒', reply_markup=keyboard.as_markup())
     else:
-        pass
-        # await message.answer(text='TODO сделать какую нибудь связь, типо бд', reply_markup=keyboard.as_markup())
+        link_chat_to_user(message.from_user.id, message.forward_from_chat.id)
+        await message.answer(text='😊 Канал привязан, теперь вы можете писать посты', reply_markup=keyboard.as_markup())
 
 # функция для показа текущего поста
 @dp.message(Command('preview'))
-async def show_current_post(message: types.Message):
+async def show_current_post(message: Message):
     if dict_for_messages['photo']:
         await bot.send_photo(chat_id=message.chat.id, photo=dict_for_messages['photo'], caption=dict_for_messages['text'])
     else:
@@ -109,20 +100,20 @@ async def show_current_post(message: types.Message):
 
 # Обработчик команды /publish
 @dp.message(Command('publish'))
-async def publish_command(message: types.Message):
+async def publish_command(message: Message):
     # Здесь можно добавить логику для публикации сохранённого поста
     await message.reply("Пост опубликован.")
 
 # Обработчик текстовых сообщений
 @dp.message(F.text)
-async def handle_text(message: types.Message):
+async def handle_text(message: Message):
     dict_for_messages['text'] = message.text
     # Здесь можно добавить логику для сохранения текста и предварительного просмотра
     await message.reply("Текст получен. Отправьте медиафайлы.")
 
 # Обработчик медиафайлов
 @dp.message(F.photo)
-async def handle_media(message: types.Message):
+async def handle_media(message: Message):
     dict_for_messages['photo'] = message.photo[2].file_id
     print(dict_for_messages['photo'])
     # Здесь можно добавить логику для сохранения медиафайлов и предварительного просмотра
