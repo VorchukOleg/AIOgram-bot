@@ -32,7 +32,7 @@ async def get_links_of_user(user_id: int) -> list[Chat]:
             if status == 2:
                 chats.append(chat)
             else:
-                Linking.delete().where(Linking.chat_id == link.chat_id).where(Linking.user_id == user_id).execute()
+                Linking.delete().where(Linking.chat_id == link.chat_id, Linking.user_id == user_id).execute()
         except TelegramForbiddenError:
             Linking.delete().where(Linking.chat_id == link.chat_id).execute()
     return chats
@@ -48,3 +48,6 @@ async def is_linked(user_id: int, chat_id: int) -> Chat | None:
     except TelegramForbiddenError:
         Linking.delete().where(Linking.chat_id == chat_id).execute()
     return chat
+
+def unlink_chat_from_user(user_id: int, chat_id: int):
+    Linking.delete().where(Linking.user_id==user_id, Linking.chat_id==chat_id).execute()
