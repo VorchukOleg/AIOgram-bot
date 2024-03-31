@@ -23,7 +23,7 @@ async def start_command(message: Message):
     keyboard = keyboard.add(InlineKeyboardButton(text='✍️ Каналы', callback_data='channels'))
     text = '💻 Привет'
     if message.chat.id in states:
-        del states[message.chat.from_user.id]
+        del states[message.chat.id]
     await answer(message, text=text, reply_markup=keyboard.as_markup())
 
 # Функция при нажатие кнопки (при получение callback query если в нём query.data == 'channels')
