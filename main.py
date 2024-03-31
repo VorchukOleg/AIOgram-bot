@@ -65,7 +65,6 @@ async def callback_main(query: CallbackQuery):
 # Это достаточно сложный фильтр которые занимается подменю... (см на ф-ию adding_channel_forward)
 def adding_channel_filter():
     def check(x: Message):
-        print(x.chat.id == x.from_user.id and x.forward_from_chat is not None,  x.from_user.id in states and states[x.from_user.id]['state'] == 'adding_channel')
         return x.chat.id == x.from_user.id and x.forward_from_chat is not None and x.from_user.id in states and states[x.from_user.id]['state'] == 'adding_channel'
     return check
 
@@ -104,7 +103,7 @@ async def adding_channel_forward(message: Message):
 @dp.message(Command('preview'))
 async def show_current_post(message: types.Message):
     if dict_for_messages['photo']:
-        await bot(SendPhoto(chat_id=message.chat.id, photo=dict_for_messages['photo'], caption=dict_for_messages['text']))
+        await bot.send_photo(chat_id=message.chat.id, photo=dict_for_messages['photo'], caption=dict_for_messages['text'])
     else:
         await message.answer(text=dict_for_messages['text'])
 
