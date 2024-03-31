@@ -2,9 +2,9 @@ import asyncio
 import logging
 import sys
 from aiogram import F
-from aiogram.types import Message, InlineKeyboardButton, CallbackQuery
+from aiogram.types import Message, InlineKeyboardButton, KeyboardButton, CallbackQuery
 from aiogram.filters import CommandStart, Command
-from aiogram.utils.keyboard import InlineKeyboardBuilder
+from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardBuilder
 from aiogram import F
 
 from globals import *
@@ -22,6 +22,8 @@ async def start_command(message: Message):
     keyboard = InlineKeyboardBuilder()
     keyboard = keyboard.add(InlineKeyboardButton(text='✍️ Каналы', callback_data='channels'))
     text = '💻 Привет'
+    if message.chat.id in states:
+        del states[message.chat.from_user.id]
     # Условие необходимое для проверки, это сообщение бота или человека (т.к. данная функция вызывается и тут и через callback_main)
     if message.from_user.id == bot.id:
         await message.edit_text(text, reply_markup=keyboard.as_markup())
@@ -37,6 +39,27 @@ async def channels_callback(query: CallbackQuery):
     keyboard = keyboard.row(InlineKeyboardButton(text='➕ Добавить канал', callback_data='add_channel'), InlineKeyboardButton(text='↩️ На главную', callback_data='main'))
     await query.message.edit_text(text='💻 Выберите канал', reply_markup=keyboard.as_markup())
 
+async def channel_menu(c: CallbackQuery | Message, chat_id: int | None = None):
+    user_id: int
+    if isinstance(c, CallbackQuery):
+        user_id = c.from_user.id
+    else:
+        user_id = c.chat.id
+    states[user_id] = {
+        'state': 'channel',
+        'chat_id': chat_id or states[user_id]['chat_id']
+    }
+    chat = await bot.get_chat(states[user_id]['chat_id'])
+    keyboard = InlineKeyboardBuilder()
+    keyboard = keyboard.row(InlineKeyboardButton(text='✍️ Написать новый пост', callback_data='write_post'))
+    keyboard = keyboard.row(InlineKeyboardButton(text='✍️ Каналы', callback_data='channels'))
+    text = '💻 Канал: ' + chat.full_name + '\n\nЧто вы хотите сделать?'
+    if isinstance(c, CallbackQuery):
+        await c.message.edit_text(text=text, reply_markup=keyboard.as_markup())
+    else:
+        await c.answer(text=text, reply_markup=keyboard.as_markup())
+
+
 # Функция управление привязанным каналом
 @dp.callback_query(lambda x: x.data.startswith('channel_'))
 async def channel_open_callback(query: CallbackQuery):
@@ -46,13 +69,7 @@ async def channel_open_callback(query: CallbackQuery):
         keyboard = keyboard.row(InlineKeyboardButton(text='✍️ Каналы', callback_data='channels'))
         await query.message.edit_text(text='❌ Нет доступа', reply_markup=keyboard.as_markup())
         return
-    states[query.from_user.id] = {
-        'state': 'channel',
-        'chat_id': chat.id
-    }
-    keyboard = keyboard.row(InlineKeyboardButton(text='✍️ Написать новый пост', callback_data='write_post'))
-    keyboard = keyboard.row(InlineKeyboardButton(text='✍️ Каналы', callback_data='channels'))
-    await query.message.edit_text(text='💻 Канал: ' + chat.full_name + '\n\nЧто вы хотите сделать?', reply_markup=keyboard.as_markup())
+    await channel_menu(query, chat.id)
 
 
 # Функция при нажатие кнопки (при получение callback query если в нём query.data == 'add_channel')
@@ -90,29 +107,49 @@ async def adding_channel_forward(message: Message):
         link_chat_to_user(message.from_user.id, message.forward_from_chat.id)
         await message.answer(text='😊 Канал привязан, теперь вы можете писать посты', reply_markup=keyboard.as_markup())
 
+# Функция при нажатие для созданиие поста
+@dp.callback_query(lambda x: clbk_filter('write_post')(x) and x.from_user.id in states and states[x.from_user.id]['state'] == 'channel')
+async def write_post_callback(query: CallbackQuery): 
+    states[query.from_user.id] = {
+        'state': 'writing_post',
+        'chat_id': states[query.from_user.id]['chat_id']
+    }
+    await query.message.edit_text(text='👍 Режим написание поста\n\nОтправьте фото или текст\n\nКоманды:\n/preview - Показать как пост будет выглядить\n/publish - Опубликовать пост\n/cancel - Вернутся в меню настройки канала')
+
+# Фильтр именно для редактирование постов
+def writing_filter():
+    def check(x: Message):
+        return x.from_user.id in states and states[x.from_user.id]['state'] == 'writing_post'
+    return check
+
 # функция для показа текущего поста
-@dp.message(Command('preview'))
+@dp.message(Command('preview'), writing_filter())
 async def show_current_post(message: Message):
-    if dict_for_messages['photo']:
+    if 'photo' in dict_for_messages:
         await bot.send_photo(chat_id=message.chat.id, photo=dict_for_messages['photo'], caption=dict_for_messages['text'])
     else:
         await message.answer(text=dict_for_messages['text'])
 
 # Обработчик команды /publish
-@dp.message(Command('publish'))
+@dp.message(Command('publish'), writing_filter())
 async def publish_command(message: Message):
     # Здесь можно добавить логику для публикации сохранённого поста
     await message.reply("Пост опубликован.")
 
+# Обработчик команды /cancel
+@dp.message(Command('cancel'), writing_filter())
+async def publish_command(message: Message):
+    await channel_menu(message)
+
 # Обработчик текстовых сообщений
-@dp.message(F.text)
+@dp.message(F.text, writing_filter())
 async def handle_text(message: Message):
     dict_for_messages['text'] = message.text
     # Здесь можно добавить логику для сохранения текста и предварительного просмотра
     await message.reply("Текст получен. Отправьте медиафайлы.")
 
 # Обработчик медиафайлов
-@dp.message(F.photo)
+@dp.message(F.photo, writing_filter())
 async def handle_media(message: Message):
     dict_for_messages['photo'] = message.photo[2].file_id
     print(dict_for_messages['photo'])
@@ -122,7 +159,6 @@ async def handle_media(message: Message):
 # Функция для публикации поста
 async def publish_post(text, media):
     # Здесь реализуйте логику публикации поста в канал
-
     pass
 
 # # Добавление кнопки к посту
