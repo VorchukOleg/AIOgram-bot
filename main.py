@@ -13,8 +13,6 @@ from utils import clbk_filter, is_user_admin, get_user_id, answer
 
 # Словарь состояние... Это состаяние в котором бот находится бот для каждого пользователи поотдельности
 states = {}
-# Может dict_for_messages объединить с states - фактически у них общая задача - хранить значение общение с ботом
-dict_for_messages = {}
 
 # Функция которая запускается при Старте
 @dp.message(CommandStart())
@@ -100,7 +98,10 @@ async def adding_channel_forward(message: Message):
 async def write_post_callback(query: CallbackQuery): 
     states[query.from_user.id] = {
         'state': 'writing_post',
-        'chat_id': states[query.from_user.id]['chat_id']
+        'chat_id': states[query.from_user.id]['chat_id'],
+        'message': {
+
+        }
     }
     await query.message.edit_text(text='👍 Режим написание поста\n\nОтправьте фото или текст\n\nКоманды:\n/preview - Показать как пост будет выглядить\n/publish - Опубликовать пост\n/cancel - Вернутся в меню настройки канала')
 
@@ -113,10 +114,10 @@ def writing_filter():
 # функция для показа текущего поста
 @dp.message(Command('preview'), writing_filter())
 async def show_current_post(message: Message):
-    if 'photo' in dict_for_messages:
-        await bot.send_photo(chat_id=message.chat.id, photo=dict_for_messages['photo'], caption=dict_for_messages['text'])
+    if 'photo' in states[message.chat.id]['message']:
+        await bot.send_photo(chat_id=message.chat.id, photo=states[message.chat.id]['message']['photo'], caption=states[message.chat.id]['message']['text'])
     else:
-        await message.answer(text=dict_for_messages['text'])
+        await message.answer(text=states[message.chat.id]['message']['text'])
 
 # Обработчик команды /publish
 @dp.message(Command('publish'), writing_filter())
@@ -132,15 +133,15 @@ async def publish_command(message: Message):
 # Обработчик текстовых сообщений
 @dp.message(F.text, writing_filter())
 async def handle_text(message: Message):
-    dict_for_messages['text'] = message.text
+    states[message.chat.id]['message']['text'] = message.text
     # Здесь можно добавить логику для сохранения текста и предварительного просмотра
     await message.reply("Текст получен. Отправьте медиафайлы.")
 
 # Обработчик медиафайлов
 @dp.message(F.photo, writing_filter())
 async def handle_media(message: Message):
-    dict_for_messages['photo'] = message.photo[2].file_id
-    print(dict_for_messages['photo'])
+    states[message.chat.id]['message']['photo'] = message.photo[2].file_id
+    print(states[message.chat.id]['message']['photo'])
     # Здесь можно добавить логику для сохранения медиафайлов и предварительного просмотра
     await message.reply("Медиафайл получен. Готов к публикации.")
 
