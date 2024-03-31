@@ -3,6 +3,8 @@ from aiogram.types import CallbackQuery, ChatMemberAdministrator, Chat, Message
 from aiogram.exceptions import TelegramForbiddenError, TelegramBadRequest
 from aiogram.enums import ChatMemberStatus
 
+Context = CallbackQuery | Message
+
 # Функция для создание фильтр (для фитрации данных callback запросов)
 def clbk_filter(data: str):
     def check(x: CallbackQuery):

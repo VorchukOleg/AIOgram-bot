@@ -9,7 +9,7 @@ from aiogram import F
 
 from globals import *
 from database import link_chat_to_user, get_links_of_user, is_linked, unlink_chat_from_user
-from utils import clbk_filter, is_user_admin, get_user_id, answer
+from utils import clbk_filter, is_user_admin, get_user_id, answer, Context
 
 # Словарь состояние... Это состаяние в котором бот находится бот для каждого пользователи поотдельности
 states = {}
@@ -24,7 +24,7 @@ async def start_command(message: Message):
         del states[message.chat.id]
     await answer(message, text=text, reply_markup=keyboard.as_markup())
 
-async def channels_menu(c: CallbackQuery | Message):
+async def channels_menu(c: Context):
     keyboard = InlineKeyboardBuilder()
     if get_user_id(c) in states:
         del states[get_user_id(c)]
@@ -38,7 +38,7 @@ async def channels_menu(c: CallbackQuery | Message):
 async def channels_callback(query: CallbackQuery):
     await channels_menu(query)
 
-async def channel_menu(c: CallbackQuery | Message, chat_id: int | None = None):
+async def channel_menu(c: Context, chat_id: int | None = None):
     user_id = get_user_id(c)
     states[user_id] = {
         'state': 'channel',
