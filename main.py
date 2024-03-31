@@ -111,19 +111,26 @@ def writing_filter():
         return x.from_user.id in states and states[x.from_user.id]['state'] == 'writing_post'
     return check
 
+# Отправка поста в некий чат
+async def send_current_post(user_id: int, chat_id: int):
+    if 'photo' in states[user_id]['message']:
+        await bot.send_photo(chat_id=chat_id, photo=states[user_id]['message']['photo'], caption=states[user_id]['message']['text'])
+    else:
+        await bot.send_message(chat_id=chat_id, text=states[user_id]['message']['text'])
+
 # функция для показа текущего поста
 @dp.message(Command('preview'), writing_filter())
 async def show_current_post(message: Message):
-    if 'photo' in states[message.chat.id]['message']:
-        await bot.send_photo(chat_id=message.chat.id, photo=states[message.chat.id]['message']['photo'], caption=states[message.chat.id]['message']['text'])
-    else:
-        await message.answer(text=states[message.chat.id]['message']['text'])
+    await send_current_post(message.chat.id, message.chat.id)
 
 # Обработчик команды /publish
 @dp.message(Command('publish'), writing_filter())
 async def publish_command(message: Message):
     # Здесь можно добавить логику для публикации сохранённого поста
     await message.reply("Пост опубликован.")
+    # Временаня логика отправки в канал
+    await send_current_post(message.chat.id, states[message.chat.id]['chat_id'])
+    await channel_menu(message)
 
 # Обработчик команды /cancel
 @dp.message(Command('cancel'), writing_filter())
