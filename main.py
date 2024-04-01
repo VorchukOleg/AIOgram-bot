@@ -96,7 +96,7 @@ async def write_post_callback(query: CallbackQuery):
         chat_id=states[get_user_id(query)].chat_id,
         post=Post()
     )
-    await query.message.edit_text(text='👍 Режим написание поста\n\nОтправьте фото или текст\n\nКоманды:\n/preview - Показать как пост будет выглядить\n/publish - Опубликовать пост\n/cancel - Вернутся в меню настройки канала')
+    await query.message.edit_text(text='👍 Режим написание поста\n\nОтправьте фото или текст\n\nКоманды:\n/preview - Показать как пост будет выглядить\n/publish - Опубликовать пост\n/button - Добавить кнопку/ссылку под пост\n/cancel - Вернутся в меню настройки канала')
 
 @dp.callback_query(CallbackFilter('unlink_channel'), StateFilter('channel'))
 async def unlink_channel_callback(query: CallbackQuery):
@@ -127,6 +127,16 @@ async def publish_command(message: Message):
 @dp.message(Command('cancel'), StateFilter('writing_post'))
 async def publish_command(message: Message):
     await channel_menu(message)
+
+# Обработчик команды /button
+@dp.message(Command('button'), StateFilter('writing_post'))
+async def publish_command(message: Message):
+    args = message.text.split()
+    if len(args) < 3:
+        await answer(message, "❓Как добавить кнопку\n\nПример:\n/button https://bmstu.ru Сайт МГТУ им Н. Э. Баумана")
+        return
+    states[get_user_id(message)].post.buttons.append([(' '.join(args[2:]), args[1])])
+    await answer(message, "➕ Кнопка добавлена")
 
 # Обработчик текстовых сообщений
 @dp.message(F.text, StateFilter('writing_post'))
