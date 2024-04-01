@@ -9,9 +9,10 @@ from aiogram import F
 
 from globals import *
 from state import states, StateFilter, delete_state
-from database import link_chat_to_user, get_links_of_user, is_linked, unlink_chat_from_user
+from database import link_chat_to_user, get_links_of_user, is_linked, unlink_chat_from_user, add_schedule
 from utils import CallbackFilter, is_user_admin, get_user_id, answer, Context
 from classes import Post, State
+import scheduler
 
 # Функция которая запускается при Старте
 @dp.message(CommandStart())
@@ -138,6 +139,18 @@ async def publish_command(message: Message):
     states[get_user_id(message)].post.buttons.append([(' '.join(args[2:]), args[1])])
     await answer(message, "➕ Кнопка добавлена")
 
+from datetime import datetime, timedelta
+
+# Обработчик команды /schedule
+@dp.message(Command('schedule'), StateFilter('writing_post'))
+async def publish_command(message: Message):
+    if states[get_user_id(message)].post.is_empty():
+        await message.reply("Пост пустой.")
+        return
+    add_schedule(states[get_user_id(message)].chat_id, datetime.now() + timedelta(minutes=1), states[get_user_id(message)].post)
+    await answer(message, "⌚ Пост запланирован!")
+    await channel_menu(message)
+
 # Обработчик текстовых сообщений
 @dp.message(F.text, StateFilter('writing_post'))
 async def handle_text(message: Message):
@@ -157,5 +170,6 @@ async def main():
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO, stream=sys.stdout)
+    scheduler.run()
     asyncio.run(main())
     

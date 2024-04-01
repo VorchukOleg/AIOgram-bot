@@ -1,13 +1,15 @@
 from globals import bot
+from aiogram import Bot
 from aiogram.types import InputMediaPhoto, InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
+import json
 
 class Post:
     text: str = ''
     photo: list[str] = []
     buttons: list[list[tuple[str, str]]] = []
 
-    async def send(self, chat_id: int):
+    async def send(self, chat_id: int, bot: Bot = bot):
         keyboard = InlineKeyboardBuilder()
         for row in self.buttons:
             keyboard = keyboard.row(*[InlineKeyboardButton(text=x[0], url=x[1]) for x in row])
@@ -23,6 +25,28 @@ class Post:
     
     def is_empty(self):
         return self.text == '' and len(self.photo) == 0
+    
+    def serialize(self):
+        return json.dumps({
+            'text': self.text,
+            'photo': self.photo,
+            'buttons': self.buttons,
+        })
+
+    @staticmethod
+    def deserialize(jsn: str):
+        values = json.loads(jsn)
+        post = Post()
+        post.text = values['text']
+        post.photo = values['photo']
+        post.buttons = values['buttons']
+        return post
+
+    def __str__(self) -> str:
+        return f'({self.text or 'None'}, {self.photo}, {self.buttons})'
+    
+    def __repr__(self) -> str:
+        return self.__str__()
 
 class State:
     status: str 
