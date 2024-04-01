@@ -89,6 +89,16 @@ async def adding_channel_forward(message: Message):
         link_chat_to_user(get_user_id(message), message.forward_from_chat.id)
         await message.answer(text='😊 Канал привязан, теперь вы можете писать посты', reply_markup=keyboard.as_markup())
 
+# Генерации клавиатуру для редактирование
+def create_write_keyboard():
+    keyboard = InlineKeyboardBuilder()
+    keyboard = keyboard.row(InlineKeyboardButton(text='📰 Опубликовать', callback_data='publish_post'))
+    keyboard = keyboard.row(InlineKeyboardButton(text='👁️ Предпросмотр', callback_data='preview_post'))
+    keyboard = keyboard.row(InlineKeyboardButton(text='🩹 Очистить', callback_data='rewrite_post'))
+    keyboard = keyboard.row(InlineKeyboardButton(text='❌ Отмена', callback_data='cancel_post'))
+    return keyboard
+
+
 # Функция при нажатие для созданиие поста
 @dp.callback_query(CallbackFilter('write_post'), StateFilter('channel'))
 async def write_post_callback(query: CallbackQuery): 
@@ -97,7 +107,7 @@ async def write_post_callback(query: CallbackQuery):
         chat_id=states[get_user_id(query)].chat_id,
         post=Post()
     )
-    await query.message.edit_text(text='👍 Режим написание поста\n\nОтправьте фото или текст\n\nКоманды:\n/preview - Показать как пост будет выглядить\n/publish - Опубликовать пост\n/button - Добавить кнопку/ссылку под пост\n/schedule - Опубликовать в опредёленное время\n/cancel - Вернутся в меню настройки канала')
+    await answer(query, text='👍 Режим написание поста\n\nОтправьте фото или текст\n\n', reply_markup=create_write_keyboard().as_markup())
 
 @dp.callback_query(CallbackFilter('unlink_channel'), StateFilter('channel'))
 async def unlink_channel_callback(query: CallbackQuery):
@@ -105,29 +115,32 @@ async def unlink_channel_callback(query: CallbackQuery):
     await channels_menu(query)
 
 # функция для показа текущего поста
-@dp.message(Command('preview'), StateFilter('writing_post'))
-async def show_current_post(message: Message):
-    if states[get_user_id(message)].post.is_empty():
-        await message.reply("Пост пустой.")
+@dp.callback_query(StateFilter('writing_post'), CallbackFilter('preview_post'))
+async def show_current_post(query: CallbackQuery):
+    if states[get_user_id(query)].post.is_empty():
+        await answer(query, "Пост пустой.", reply_markup=create_write_keyboard().as_markup())
         return
-    await states[get_user_id(message)].post.send(message.chat.id)
+    else:
+        await query.answer()
+    await states[get_user_id(query)].post.send(get_user_id(query))
+    await bot.send_message(chat_id=get_user_id(query), text='👁️ Предпросмотр', reply_markup=create_write_keyboard().as_markup())
 
 # Обработчик команды /publish
-@dp.message(Command('publish'), StateFilter('writing_post'))
-async def publish_command(message: Message):
-    if states[get_user_id(message)].post.is_empty():
-        await message.reply("Пост пустой.")
+@dp.callback_query(StateFilter('writing_post'), CallbackFilter('publish_post'))
+async def publish_command(query: CallbackQuery):
+    if states[get_user_id(query)].post.is_empty():
+        await answer(query, "Пост пустой.", reply_markup=create_write_keyboard().as_markup())
         return
     # Здесь можно добавить логику для публикации сохранённого поста
-    await message.reply("Пост опубликован.")
+    await answer(query, "Пост опубликован.")
     # Временаня логика отправки в канал
-    await states[get_user_id(message)].post.send(states[get_user_id(message)].chat_id)
-    await channel_menu(message)
+    await states[get_user_id(query)].post.send(states[get_user_id(query)].chat_id)
+    await channel_menu(query)
 
 # Обработчик команды /cancel
-@dp.message(Command('cancel'), StateFilter('writing_post'))
-async def publish_command(message: Message):
-    await channel_menu(message)
+@dp.callback_query(StateFilter('writing_post'), CallbackFilter('cancel_post'))
+async def publish_command(query: CallbackQuery):
+    await channel_menu(query)
 
 # Обработчик команды /button
 @dp.message(Command('button'), StateFilter('writing_post'))
@@ -138,8 +151,6 @@ async def publish_command(message: Message):
         return
     states[get_user_id(message)].post.buttons.append([(' '.join(args[2:]), args[1])])
     await answer(message, "➕ Кнопка добавлена")
-
-from datetime import datetime, timedelta
 
 # Обработчик команды /schedule
 @dp.message(Command('schedule'), StateFilter('writing_post'))
@@ -155,19 +166,24 @@ async def publish_command(message: Message):
     await answer(message, "⌚ Пост запланирован!")
     await channel_menu(message)
 
+# При нажатие на переписать пост
+@dp.callback_query(StateFilter('writing_post'), CallbackFilter('rewrite_post'))
+async def rewrite_post_callback(query: CallbackQuery):
+    await answer(query, text="Отправьте новый текст или файлы для изменения поста.", reply_markup=create_write_keyboard().as_markup())
+
 # Обработчик текстовых сообщений
 @dp.message(F.text, StateFilter('writing_post'))
 async def handle_text(message: Message):
     states[get_user_id(message)].post.text = message.md_text
     # Здесь можно добавить логику для сохранения текста и предварительного просмотра
-    await message.reply("Текст получен. Отправьте медиафайлы.")
+    await answer(message, text="Текст получен. Отправьте медиафайлы.", reply_markup=create_write_keyboard().as_markup())
 
 # Обработчик медиафайлов
 @dp.message(F.photo, StateFilter('writing_post'))
 async def handle_media(message: Post):
     states[get_user_id(message)].post.photo.append(message.photo[-1].file_id)
     # Здесь можно добавить логику для сохранения медиафайлов и предварительного просмотра
-    await message.reply("Медиафайл получен. Готов к публикации.")
+    await answer(message, text="Медиафайл получен. Готов к публикации.", reply_markup=create_write_keyboard().as_markup())
 
 async def main():
     await dp.start_polling(bot)

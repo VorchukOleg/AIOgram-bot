@@ -5,12 +5,18 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 import json
 
 class Post:
-    text: str = ''
-    photo: list[str] = []
-    buttons: list[list[tuple[str, str]]] = []
+    text: str
+    photo: list[str]
+    buttons: list[list[tuple[str, str]]]
+
+    def __init__(self) -> None:
+        self.text = ''
+        self.photo = []
+        self.buttons = []
 
     async def send(self, chat_id: int, bot: Bot = bot):
         keyboard = InlineKeyboardBuilder()
+        print(self)
         for row in self.buttons:
             keyboard = keyboard.row(*[InlineKeyboardButton(text=x[0], url=x[1]) for x in row])
         if len(self.photo) == 1:
