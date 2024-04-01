@@ -146,7 +146,7 @@ async def publish_command(message: Message):
 # Обработчик текстовых сообщений
 @dp.message(F.text, writing_filter())
 async def handle_text(message: Message):
-    states[message.chat.id]['message'].text = message.text
+    states[message.chat.id]['message'].text = message.md_text
     # Здесь можно добавить логику для сохранения текста и предварительного просмотра
     await message.reply("Текст получен. Отправьте медиафайлы.")
 
