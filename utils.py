@@ -6,7 +6,7 @@ from aiogram.enums import ChatMemberStatus
 Context = CallbackQuery | Message
 
 # Функция для создание фильтр (для фитрации данных callback запросов)
-def clbk_filter(data: str):
+def CallbackFilter(data: str):
     def check(x: CallbackQuery):
         return x.data == data
     return check
