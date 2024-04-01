@@ -10,10 +10,14 @@ from aiogram import F
 from globals import *
 from database import link_chat_to_user, get_links_of_user, is_linked, unlink_chat_from_user
 from utils import clbk_filter, is_user_admin, get_user_id, answer, Context
-from message import Post
+from classes import Post, State
 
 # Словарь состояние... Это состаяние в котором бот находится бот для каждого пользователи поотдельности
-states = {}
+states: dict[str, State] = {}
+
+def delete_state(c: Context):
+    if get_user_id(c) in states:
+        del states[get_user_id(c)]
 
 # Функция которая запускается при Старте
 @dp.message(CommandStart())
@@ -21,14 +25,12 @@ async def start_command(message: Message):
     keyboard = InlineKeyboardBuilder()
     keyboard = keyboard.add(InlineKeyboardButton(text='📚 Каналы', callback_data='channels'))
     text = '💻 Привет'
-    if message.chat.id in states:
-        del states[message.chat.id]
+    delete_state(message)
     await answer(message, text=text, reply_markup=keyboard.as_markup())
 
 async def channels_menu(c: Context):
     keyboard = InlineKeyboardBuilder()
-    if get_user_id(c) in states:
-        del states[get_user_id(c)]
+    delete_state(c)
     for linkedChat in await get_links_of_user(get_user_id(c)):
         keyboard = keyboard.row(InlineKeyboardButton(text=linkedChat.full_name, callback_data='channel_' + str(linkedChat.id)))
     keyboard = keyboard.row(InlineKeyboardButton(text='➕ Добавить канал', callback_data='add_channel'), InlineKeyboardButton(text='↩️ На главную', callback_data='main'))
@@ -41,11 +43,11 @@ async def channels_callback(query: CallbackQuery):
 
 async def channel_menu(c: Context, chat_id: int | None = None):
     user_id = get_user_id(c)
-    states[user_id] = {
-        'state': 'channel',
-        'chat_id': chat_id or states[user_id]['chat_id']
-    }
-    chat = await bot.get_chat(states[user_id]['chat_id'])
+    states[user_id] = State(
+        'channel',
+        chat_id=chat_id or states[user_id].chat_id
+    )
+    chat = await bot.get_chat(states[user_id].chat_id)
     keyboard = InlineKeyboardBuilder()
     keyboard = keyboard.row(InlineKeyboardButton(text='✍️ Написать новый пост', callback_data='write_post'))
     keyboard = keyboard.row(InlineKeyboardButton(text='❌ Отвязать', callback_data='unlink_channel'))
@@ -68,9 +70,7 @@ async def channel_open_callback(query: CallbackQuery):
 # Функция при нажатие кнопки (при получение callback query если в нём query.data == 'add_channel')
 @dp.callback_query(clbk_filter('add_channel'))
 async def add_channel(query: CallbackQuery):
-    states[query.from_user.id] = {
-        'state': 'adding_channel'
-    }
+    states[get_user_id(query)] = State('adding_channel')
     keyboard = InlineKeyboardBuilder()
     keyboard = keyboard.row(InlineKeyboardButton(text='Отмена', callback_data='channels'))
     await query.message.edit_text(text='➕ Добавление канала\n\n1) Добавьте меня в канал\n2) Перешлите суда одно сообщение из канала', reply_markup=keyboard.as_markup())
@@ -83,7 +83,7 @@ async def callback_main(query: CallbackQuery):
 # Это достаточно сложный фильтр которые занимается подменю... (см на ф-ию adding_channel_forward)
 def adding_channel_filter():
     def check(x: Message):
-        return x.chat.id == x.from_user.id and x.forward_from_chat is not None and x.from_user.id in states and states[x.from_user.id]['state'] == 'adding_channel'
+        return x.chat.id == x.from_user.id and x.forward_from_chat is not None and get_user_id(x) in states and states[x.from_user.id].status == 'adding_channel'
     return check
     
 # По моей идеи, можно будет к боту привязыватся тг каналы, и для этого нужно подменю
@@ -91,43 +91,43 @@ def adding_channel_filter():
 async def adding_channel_forward(message: Message):
     keyboard = InlineKeyboardBuilder()
     keyboard = keyboard.row(InlineKeyboardButton(text='В меню', callback_data='channels'))
-    status = await is_user_admin(message.from_user.id, message.forward_from_chat)
+    status = await is_user_admin(get_user_id(message), message.forward_from_chat)
     if status == 0:
         await message.answer(text='Я не участник данного канала 😒', reply_markup=keyboard.as_markup())
     elif status == 1:
         await message.answer(text='Ты не админ 😒', reply_markup=keyboard.as_markup())
     else:
-        link_chat_to_user(message.from_user.id, message.forward_from_chat.id)
+        link_chat_to_user(get_user_id(message), message.forward_from_chat.id)
         await message.answer(text='😊 Канал привязан, теперь вы можете писать посты', reply_markup=keyboard.as_markup())
 
 def channel_filter():
-    return lambda x: x.from_user.id in states and states[x.from_user.id]['state'] == 'channel'
+    return lambda x: x.from_user.id in states and states[x.from_user.id].status == 'channel'
 
 # Функция при нажатие для созданиие поста
 @dp.callback_query(clbk_filter('write_post'), channel_filter())
 async def write_post_callback(query: CallbackQuery): 
-    states[query.from_user.id] = {
-        'state': 'writing_post',
-        'chat_id': states[query.from_user.id]['chat_id'],
-        'message': Post()
-    }
+    states[get_user_id(query)] = State(
+        'writing_post',
+        chat_id=states[get_user_id(query)].chat_id,
+        post=Post()
+    )
     await query.message.edit_text(text='👍 Режим написание поста\n\nОтправьте фото или текст\n\nКоманды:\n/preview - Показать как пост будет выглядить\n/publish - Опубликовать пост\n/cancel - Вернутся в меню настройки канала')
 
 @dp.callback_query(clbk_filter('unlink_channel'), channel_filter())
 async def unlink_channel_callback(query: CallbackQuery):
-    unlink_chat_from_user(query.from_user.id, states[query.from_user.id]['chat_id'])
+    unlink_chat_from_user(query.from_user.id, states[query.from_user.id].chat_id)
     await channels_menu(query)
 
 # Фильтр именно для редактирование постов
 def writing_filter():
     def check(x: Message):
-        return x.from_user.id in states and states[x.from_user.id]['state'] == 'writing_post'
+        return x.from_user.id in states and states[x.from_user.id].status == 'writing_post'
     return check
 
 # функция для показа текущего поста
 @dp.message(Command('preview'), writing_filter())
 async def show_current_post(message: Message):
-    await states[message.chat.id]['message'].send(message.chat.id)
+    await states[message.chat.id].post.send(message.chat.id)
 
 # Обработчик команды /publish
 @dp.message(Command('publish'), writing_filter())
@@ -135,7 +135,7 @@ async def publish_command(message: Message):
     # Здесь можно добавить логику для публикации сохранённого поста
     await message.reply("Пост опубликован.")
     # Временаня логика отправки в канал
-    await states[message.chat.id]['message'].send(states[message.chat.id]['chat_id'])
+    await states[get_user_id(message)].post.send(states[get_user_id(message)].chat_id)
     await channel_menu(message)
 
 # Обработчик команды /cancel
@@ -146,14 +146,14 @@ async def publish_command(message: Message):
 # Обработчик текстовых сообщений
 @dp.message(F.text, writing_filter())
 async def handle_text(message: Message):
-    states[message.chat.id]['message'].text = message.md_text
+    states[message.chat.id].post.text = message.md_text
     # Здесь можно добавить логику для сохранения текста и предварительного просмотра
     await message.reply("Текст получен. Отправьте медиафайлы.")
 
 # Обработчик медиафайлов
 @dp.message(F.photo, writing_filter())
 async def handle_media(message: Post):
-    states[message.chat.id]['message'].photo.append(message.photo[-1].file_id)
+    states[message.chat.id].post.photo.append(message.photo[-1].file_id)
     # Здесь можно добавить логику для сохранения медиафайлов и предварительного просмотра
     await message.reply("Медиафайл получен. Готов к публикации.")
 
