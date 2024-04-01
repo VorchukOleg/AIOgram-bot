@@ -2,6 +2,8 @@ from globals import *
 from aiogram.types import CallbackQuery, ChatMemberAdministrator, Chat, Message
 from aiogram.exceptions import TelegramForbiddenError, TelegramBadRequest
 from aiogram.enums import ChatMemberStatus
+from datetime import datetime
+import re
 
 Context = CallbackQuery | Message
 
@@ -43,3 +45,16 @@ async def answer(c: CallbackQuery | Message, *args, **kwargs):
         await c.edit_text(*args, **kwargs)
     else:
         await c.answer(*args, **kwargs)
+
+def parse_date(raw: str):
+    m = re.search(r'(\d+)\.(\d+).(\d+) (\d+):(\d+)', raw)
+    if m is None:
+        return None
+    date = datetime(
+        day=int(m.group(1)),
+        month=int(m.group(2)),
+        year=int(m.group(3)),
+        hour=int(m.group(4)),
+        minute=int(m.group(5)),
+    )
+    return date

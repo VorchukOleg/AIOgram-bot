@@ -10,7 +10,7 @@ from aiogram import F
 from globals import *
 from state import states, StateFilter, delete_state
 from database import link_chat_to_user, get_links_of_user, is_linked, unlink_chat_from_user, add_schedule
-from utils import CallbackFilter, is_user_admin, get_user_id, answer, Context
+from utils import CallbackFilter, is_user_admin, get_user_id, answer, Context, parse_date
 from classes import Post, State
 import scheduler
 
@@ -147,7 +147,11 @@ async def publish_command(message: Message):
     if states[get_user_id(message)].post.is_empty():
         await message.reply("Пост пустой.")
         return
-    add_schedule(states[get_user_id(message)].chat_id, datetime.now() + timedelta(minutes=1), states[get_user_id(message)].post)
+    args = message.text.split()
+    if len(args) < 2 or parse_date(' '.join(args[1:])) is None:
+        await answer(message, "❓Как отложить пост\n\nПример:\n/schedule 31.12.2024 23:59")
+        return
+    add_schedule(states[get_user_id(message)].chat_id, parse_date(' '.join(args[1:])), states[get_user_id(message)].post)
     await answer(message, "⌚ Пост запланирован!")
     await channel_menu(message)
 
