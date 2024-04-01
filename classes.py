@@ -14,6 +14,9 @@ class Post:
             await bot.send_media_group(chat_id, media)
         else:
             await bot.send_message(chat_id=chat_id, text=self.text, parse_mode='markdown')
+    
+    def is_empty(self):
+        return self.text == '' and len(self.photo) == 0
 
 class State:
     status: str 

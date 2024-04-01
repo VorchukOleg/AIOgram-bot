@@ -106,11 +106,17 @@ async def unlink_channel_callback(query: CallbackQuery):
 # функция для показа текущего поста
 @dp.message(Command('preview'), StateFilter('writing_post'))
 async def show_current_post(message: Message):
+    if states[get_user_id(message)].post.is_empty():
+        await message.reply("Пост пустой.")
+        return
     await states[get_user_id(message)].post.send(message.chat.id)
 
 # Обработчик команды /publish
 @dp.message(Command('publish'), StateFilter('writing_post'))
 async def publish_command(message: Message):
+    if states[get_user_id(message)].post.is_empty():
+        await message.reply("Пост пустой.")
+        return
     # Здесь можно добавить логику для публикации сохранённого поста
     await message.reply("Пост опубликован.")
     # Временаня логика отправки в канал
