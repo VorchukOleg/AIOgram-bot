@@ -153,7 +153,7 @@ async def handle_text(message: Message):
 # Обработчик медиафайлов
 @dp.message(F.photo, writing_filter())
 async def handle_media(message: Post):
-    states[message.chat.id]['message'].photo = [ message.photo[2].file_id ]
+    states[message.chat.id]['message'].photo.append(message.photo[-1].file_id)
     # Здесь можно добавить логику для сохранения медиафайлов и предварительного просмотра
     await message.reply("Медиафайл получен. Готов к публикации.")
 
