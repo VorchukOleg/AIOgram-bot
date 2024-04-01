@@ -10,6 +10,7 @@ from aiogram import F
 from globals import *
 from database import link_chat_to_user, get_links_of_user, is_linked, unlink_chat_from_user
 from utils import clbk_filter, is_user_admin, get_user_id, answer, Context
+from message import Post
 
 # Словарь состояние... Это состаяние в котором бот находится бот для каждого пользователи поотдельности
 states = {}
@@ -108,9 +109,7 @@ async def write_post_callback(query: CallbackQuery):
     states[query.from_user.id] = {
         'state': 'writing_post',
         'chat_id': states[query.from_user.id]['chat_id'],
-        'message': {
-
-        }
+        'message': Post()
     }
     await query.message.edit_text(text='👍 Режим написание поста\n\nОтправьте фото или текст\n\nКоманды:\n/preview - Показать как пост будет выглядить\n/publish - Опубликовать пост\n/cancel - Вернутся в меню настройки канала')
 
@@ -125,17 +124,10 @@ def writing_filter():
         return x.from_user.id in states and states[x.from_user.id]['state'] == 'writing_post'
     return check
 
-# Отправка поста в некий чат
-async def send_current_post(user_id: int, chat_id: int):
-    if 'photo' in states[user_id]['message']:
-        await bot.send_photo(chat_id=chat_id, photo=states[user_id]['message']['photo'], caption=states[user_id]['message']['text'])
-    else:
-        await bot.send_message(chat_id=chat_id, text=states[user_id]['message']['text'])
-
 # функция для показа текущего поста
 @dp.message(Command('preview'), writing_filter())
 async def show_current_post(message: Message):
-    await send_current_post(message.chat.id, message.chat.id)
+    await states[message.chat.id]['message'].send(message.chat.id)
 
 # Обработчик команды /publish
 @dp.message(Command('publish'), writing_filter())
@@ -143,7 +135,7 @@ async def publish_command(message: Message):
     # Здесь можно добавить логику для публикации сохранённого поста
     await message.reply("Пост опубликован.")
     # Временаня логика отправки в канал
-    await send_current_post(message.chat.id, states[message.chat.id]['chat_id'])
+    await states[message.chat.id]['message'].send(states[message.chat.id]['chat_id'])
     await channel_menu(message)
 
 # Обработчик команды /cancel
@@ -154,22 +146,16 @@ async def publish_command(message: Message):
 # Обработчик текстовых сообщений
 @dp.message(F.text, writing_filter())
 async def handle_text(message: Message):
-    states[message.chat.id]['message']['text'] = message.text
+    states[message.chat.id]['message'].text = message.text
     # Здесь можно добавить логику для сохранения текста и предварительного просмотра
     await message.reply("Текст получен. Отправьте медиафайлы.")
 
 # Обработчик медиафайлов
 @dp.message(F.photo, writing_filter())
-async def handle_media(message: Message):
-    states[message.chat.id]['message']['photo'] = message.photo[2].file_id
-    print(states[message.chat.id]['message']['photo'])
+async def handle_media(message: Post):
+    states[message.chat.id]['message'].photo = [ message.photo[2].file_id ]
     # Здесь можно добавить логику для сохранения медиафайлов и предварительного просмотра
     await message.reply("Медиафайл получен. Готов к публикации.")
-
-# Функция для публикации поста
-async def publish_post(text, media):
-    # Здесь реализуйте логику публикации поста в канал
-    pass
 
 # # Добавление кнопки к посту
 # def add_button(text):
