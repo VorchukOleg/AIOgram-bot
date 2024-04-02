@@ -92,8 +92,7 @@ async def adding_channel_forward(message: Message):
 # Генерации клавиатуру для редактирование
 def create_write_keyboard():
     keyboard = InlineKeyboardBuilder()
-    keyboard = keyboard.row(InlineKeyboardButton(text='📰 Опубликовать', callback_data='publish_post'))
-    keyboard = keyboard.row(InlineKeyboardButton(text='👁️ Предпросмотр', callback_data='preview_post'))
+    keyboard = keyboard.row(InlineKeyboardButton(text='📰 Опубликовать', callback_data='publish_post'), InlineKeyboardButton(text='👁️ Предпросмотр', callback_data='preview_post'))
     keyboard = keyboard.row(InlineKeyboardButton(text='🩹 Очистить', callback_data='rewrite_post'))
     keyboard = keyboard.row(InlineKeyboardButton(text='❌ Отмена', callback_data='cancel_post'))
     return keyboard
@@ -150,7 +149,10 @@ async def publish_command(message: Message):
         await answer(message, "❓Как добавить кнопку\n\nПример:\n/button https://bmstu.ru Сайт МГТУ им Н. Э. Баумана")
         return
     states[get_user_id(message)].post.buttons.append([(' '.join(args[2:]), args[1])])
-    await answer(message, "➕ Кнопка добавлена")
+    text = '➕ Кнопка добавлена'
+    if len(states[get_user_id(message)].post.photo) > 1:
+        text += '\n\nP.S. Инлайн Кнопки не поддерживается при множественных фоток - Ограничение Telegram 😒'
+    await answer(message, text, reply_markup=create_write_keyboard().as_markup())
 
 # Обработчик команды /schedule
 @dp.message(Command('schedule'), StateFilter('writing_post'))
@@ -169,12 +171,13 @@ async def publish_command(message: Message):
 # При нажатие на переписать пост
 @dp.callback_query(StateFilter('writing_post'), CallbackFilter('rewrite_post'))
 async def rewrite_post_callback(query: CallbackQuery):
+    states[get_user_id(query)].post = Post()
     await answer(query, text="Отправьте новый текст или файлы для изменения поста.", reply_markup=create_write_keyboard().as_markup())
 
 # Обработчик текстовых сообщений
 @dp.message(F.text, StateFilter('writing_post'))
 async def handle_text(message: Message):
-    states[get_user_id(message)].post.text = message.md_text
+    states[get_user_id(message)].post.text = message.html_text
     # Здесь можно добавить логику для сохранения текста и предварительного просмотра
     await answer(message, text="Текст получен. Отправьте медиафайлы.", reply_markup=create_write_keyboard().as_markup())
 

@@ -39,12 +39,17 @@ def get_user_id(c: CallbackQuery | Message) -> int:
     return user_id
 
 async def answer(c: CallbackQuery | Message, *args, **kwargs):
-    if isinstance(c, CallbackQuery):
-        await c.message.edit_text(*args, **kwargs)
-    elif c.from_user.id == bot.id:
-        await c.edit_text(*args, **kwargs)
-    else:
-        await c.answer(*args, **kwargs)
+    try:
+        if isinstance(c, CallbackQuery):
+            await c.message.edit_text(*args, **kwargs)
+        elif c.from_user.id == bot.id:
+            await c.edit_text(*args, **kwargs)
+        else:
+            await c.answer(*args, **kwargs)
+    except TelegramBadRequest:
+        if isinstance(c, CallbackQuery):
+            await c.answer()
+
 
 def parse_date(raw: str):
     m = re.search(r'(\d+)\.(\d+).(\d+) (\d+):(\d+)', raw)
