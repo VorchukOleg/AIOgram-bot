@@ -7,7 +7,7 @@ from globals import *
 from state import states, StateFilter, delete_state
 from utils import get_user_id, answer, Context, CallbackFilter
 from classes import State
-from database import unlink_chat_from_user, get_links_of_user, get_schedule
+from database import unlink_chat_from_user, get_links_of_user, get_schedule, count_schedule
 import constants
 
 async def channel_menu(c: Context, chat_id: int | None = None):
@@ -37,6 +37,25 @@ async def unlink_channel_callback(query: CallbackQuery):
     unlink_chat_from_user(get_user_id(query), states[get_user_id(query)].chat_id)
     await channels_menu(query)
 
+async def looking_schedule_menu(c: Context):
+    user_id = get_user_id(c)
+    post_id, post, date = get_schedule(states[user_id].chat_id, states[user_id].page)
+    if post == None:
+        await answer(c, text='Нет отложенных записей 😋')
+        await channel_menu(c)
+        return
+    await c.message.delete()
+    await post.send(user_id)
+    count = count_schedule(states[user_id].chat_id)
+    keyboard = InlineKeyboardBuilder()
+    keyboard = keyboard.row(InlineKeyboardButton(text='✍️ Отредактировать', callback_data=constants.callbacks.EDIT_POST))
+    if states[user_id].page + 1 <= count:
+        keyboard = keyboard.row(InlineKeyboardButton(text='⏭ Дальше', callback_data=constants.callbacks.NEXT_POST))
+    if states[user_id].page - 1 >= 1:
+        keyboard = keyboard.row(InlineKeyboardButton(text='⏪ Назад', callback_data=constants.callbacks.PREVIOUS_POST))
+    keyboard = keyboard.row(InlineKeyboardButton(text='📕 Вернутся в меню канала', callback_data=constants.callbacks.CANCEL))
+    await bot.send_message(user_id, text=f'Текущий пост ({states[user_id].page}/{count})\n\nДата: {date.strftime("%d.%m.%Y %H:%M")}', reply_markup=keyboard.as_markup())
+
 @dp.callback_query(CallbackFilter(constants.callbacks.LOOK_SCHEDULE), StateFilter(constants.states.CHANNEL))
 async def look_schedule(query: CallbackQuery):
     user_id = get_user_id(query)
@@ -45,18 +64,18 @@ async def look_schedule(query: CallbackQuery):
         chat_id=states[user_id].chat_id,
         page=1,
     )
-    post_id, post, date = get_schedule(states[user_id].chat_id, states[user_id].page)
-    if post == None:
-        await answer(query, text='Нет отложенных записей 😋')
-        await channel_menu(query)
-        return
-    await query.message.delete()
-    await post.send(user_id)
-    keyboard = InlineKeyboardBuilder()
-    keyboard = keyboard.row(InlineKeyboardButton(text='✍️ Отредактировать', callback_data=constants.callbacks.EDIT_POST))
-    # keyboard = keyboard.row(InlineKeyboardButton(text='⏭️ Дальше', callback_data=constants.callbacks.CANCEL))
-    keyboard = keyboard.row(InlineKeyboardButton(text='📕 Назад', callback_data=constants.callbacks.CANCEL))
-    await bot.send_message(user_id, text=f'Текущий пост\n\nДата: {date.strftime("%d.%m.%Y %H:%M")}', reply_markup=keyboard.as_markup())
+    await looking_schedule_menu(query)
+    
+
+@dp.callback_query(CallbackFilter(constants.callbacks.NEXT_POST), StateFilter(constants.states.LOOKING_SCHEDULE))
+async def cancel_looking(query: CallbackQuery):
+    states[get_user_id(query)].page += 1
+    await looking_schedule_menu(query)
+
+@dp.callback_query(CallbackFilter(constants.callbacks.PREVIOUS_POST), StateFilter(constants.states.LOOKING_SCHEDULE))
+async def cancel_looking(query: CallbackQuery):
+    states[get_user_id(query)].page -= 1
+    await looking_schedule_menu(query)
 
 @dp.callback_query(CallbackFilter(constants.callbacks.CANCEL), StateFilter(constants.states.LOOKING_SCHEDULE))
 async def cancel_looking(query: CallbackQuery):

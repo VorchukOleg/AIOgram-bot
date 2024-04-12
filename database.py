@@ -94,3 +94,6 @@ def delete_schedule(schedule_id: int):
 
 def update_schedule(schedule_id: int, post: Post, date: datetime):
     Schedule.update(post=post.serialize(), date=date).where(Schedule.id == schedule_id).execute()
+
+def count_schedule(chat_id: int):
+    return len(Schedule.select().where(Schedule.chat_id == chat_id))
