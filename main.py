@@ -12,7 +12,7 @@ from state import states, StateFilter, delete_state
 from database import link_chat_to_user, get_links_of_user, is_linked, unlink_chat_from_user, AlreadyLinked
 from utils import CallbackFilter, is_user_admin, get_user_id, answer, Context, parse_date
 from classes import State
-from menus import channel_menu
+from menus import channel_menu, channels_menu
 import scheduler
 import constants
 
@@ -25,13 +25,6 @@ async def start_command(message: Message):
     delete_state(message)
     await answer(message, text=text, reply_markup=keyboard.as_markup())
 
-async def channels_menu(c: Context):
-    keyboard = InlineKeyboardBuilder()
-    delete_state(c)
-    for linkedChat in await get_links_of_user(get_user_id(c)):
-        keyboard = keyboard.row(InlineKeyboardButton(text=linkedChat.full_name, callback_data='channel_' + str(linkedChat.id)))
-    keyboard = keyboard.row(InlineKeyboardButton(text='➕ Добавить канал', callback_data=constants.callbacks.ADD_CHANNELS), InlineKeyboardButton(text='↩️ На главную', callback_data='main'))
-    await answer(c, text='💻 Выберите канал', reply_markup=keyboard.as_markup())
 
 # Функция при нажатие кнопки (при получение callback query если в нём query.data == 'channels')
 @dp.callback_query(CallbackFilter(constants.callbacks.CHANNELS))
@@ -39,9 +32,9 @@ async def channels_callback(query: CallbackQuery):
     await channels_menu(query)
 
 # Функция управление привязанным каналом
-@dp.callback_query(lambda x: x.data.startswith('channel_'))
+@dp.callback_query(lambda x: x.data.startswith(constants.callbacks.CHANNEL_PREFIX))
 async def channel_open_callback(query: CallbackQuery):
-    chat = await is_linked(query.from_user.id, int(query.data[len('channel_'):]))
+    chat = await is_linked(query.from_user.id, int(query.data[len(constants.callbacks.CHANNEL_PREFIX):]))
     keyboard = InlineKeyboardBuilder()
     if chat is None:
         keyboard = keyboard.row(InlineKeyboardButton(text='✍️ Каналы', callback_data=constants.callbacks.CHANNELS))
@@ -53,18 +46,18 @@ async def channel_open_callback(query: CallbackQuery):
 # Функция при нажатие кнопки (при получение callback query если в нём query.data == 'add_channel')
 @dp.callback_query(CallbackFilter(constants.callbacks.ADD_CHANNELS))
 async def add_channel(query: CallbackQuery):
-    states[get_user_id(query)] = State('adding_channel')
+    states[get_user_id(query)] = State(constants.states.ADDING_CHANNEL)
     keyboard = InlineKeyboardBuilder()
     keyboard = keyboard.row(InlineKeyboardButton(text='Отмена', callback_data=constants.callbacks.CHANNELS))
     await query.message.edit_text(text='➕ Добавление канала\n\n1) Добавьте меня в канал\n2) Перешлите суда одно сообщение из канала', reply_markup=keyboard.as_markup())
 
 # Функция при нажатие кнопки (при получение callback query если в нём query.data == 'main')
-@dp.callback_query(CallbackFilter('main'))
+@dp.callback_query(CallbackFilter(constants.callbacks.MAIN))
 async def callback_main(query: CallbackQuery): 
     await start_command(query.message)
     
 # По моей идеи, можно будет к боту привязыватся тг каналы, и для этого нужно подменю
-@dp.message(StateFilter('adding_channel'))
+@dp.message(StateFilter(constants.states.ADDING_CHANNEL))
 async def adding_channel_forward(message: Message):
     keyboard = InlineKeyboardBuilder()
     keyboard = keyboard.row(InlineKeyboardButton(text='В меню', callback_data=constants.callbacks.CHANNELS))
@@ -80,12 +73,6 @@ async def adding_channel_forward(message: Message):
         except AlreadyLinked:
             await message.answer(text='😒 Канал уже был привязан', reply_markup=keyboard.as_markup())
 
-
-
-@dp.callback_query(CallbackFilter('unlink_channel'), StateFilter('channel'))
-async def unlink_channel_callback(query: CallbackQuery):
-    unlink_chat_from_user(get_user_id(query), states[get_user_id(query)].chat_id)
-    await channels_menu(query)
 
 import posteditor
 

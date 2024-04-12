@@ -57,7 +57,7 @@ class Post:
     def serialize(self):
         return json.dumps({
             'text': self.text,
-            'photo': self.photo,
+            'media': self.media,
             'buttons': self.buttons,
         })
 
@@ -66,7 +66,7 @@ class Post:
         values = json.loads(jsn)
         post = Post()
         post.text = values['text']
-        post.photo = values['photo']
+        post.media = values['media']
         post.buttons = values['buttons']
         return post
 

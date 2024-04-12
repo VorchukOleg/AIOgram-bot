@@ -10,27 +10,28 @@ from database import add_schedule
 from utils import CallbackFilter, get_user_id, answer, parse_date
 from classes import Post, CantBeMixed, State
 from menus import channel_menu
+import constants
 
 # Генерации клавиатуру для редактирование
 def create_write_keyboard():
     keyboard = InlineKeyboardBuilder()
-    keyboard = keyboard.row(InlineKeyboardButton(text='📰 Опубликовать', callback_data='publish_post'), InlineKeyboardButton(text='👁️ Предпросмотр', callback_data='preview_post'))
-    keyboard = keyboard.row(InlineKeyboardButton(text='🩹 Очистить', callback_data='rewrite_post'))
-    keyboard = keyboard.row(InlineKeyboardButton(text='❌ Отмена', callback_data='cancel_post'))
+    keyboard = keyboard.row(InlineKeyboardButton(text='📰 Опубликовать', callback_data=constants.callbacks.PUBLISH_POST), InlineKeyboardButton(text='👁️ Предпросмотр', callback_data=constants.callbacks.PREVIEW_POST))
+    keyboard = keyboard.row(InlineKeyboardButton(text='🩹 Очистить', callback_data=constants.callbacks.CLEAR_POST))
+    keyboard = keyboard.row(InlineKeyboardButton(text='❌ Отмена', callback_data=constants.callbacks.CANCEL_POST))
     return keyboard
 
 # Функция при нажатие для созданиие поста
-@dp.callback_query(CallbackFilter('write_post'), StateFilter('channel'))
+@dp.callback_query(CallbackFilter(constants.callbacks.WRITE_POST), StateFilter(constants.states.CHANNEL))
 async def write_post_callback(query: CallbackQuery): 
     states[get_user_id(query)] = State(
-        'writing_post',
+        constants.states.WRITING_POST,
         chat_id=states[get_user_id(query)].chat_id,
         post=Post()
     )
     await answer(query, text='👍 Режим написание поста\n\nОтправьте фото или текст\n\n', reply_markup=create_write_keyboard().as_markup())
 
 # функция для показа текущего поста
-@dp.callback_query(StateFilter('writing_post'), CallbackFilter('preview_post'))
+@dp.callback_query(StateFilter(constants.states.WRITING_POST), CallbackFilter(constants.callbacks.PREVIEW_POST))
 async def show_current_post(query: CallbackQuery):
     if states[get_user_id(query)].post.is_empty():
         await answer(query, "Пост пустой.", reply_markup=create_write_keyboard().as_markup())
@@ -41,7 +42,7 @@ async def show_current_post(query: CallbackQuery):
     await bot.send_message(chat_id=get_user_id(query), text='👁️ Предпросмотр', reply_markup=create_write_keyboard().as_markup())
 
 # Обработчик команды /publish
-@dp.callback_query(StateFilter('writing_post'), CallbackFilter('publish_post'))
+@dp.callback_query(StateFilter(constants.states.WRITING_POST), CallbackFilter(constants.callbacks.PUBLISH_POST))
 async def publish_command(query: CallbackQuery):
     if states[get_user_id(query)].post.is_empty():
         await answer(query, "Пост пустой.", reply_markup=create_write_keyboard().as_markup())
@@ -53,12 +54,12 @@ async def publish_command(query: CallbackQuery):
     await channel_menu(query)
 
 # Обработчик команды /cancel
-@dp.callback_query(StateFilter('writing_post'), CallbackFilter('cancel_post'))
+@dp.callback_query(StateFilter(constants.states.WRITING_POST), CallbackFilter(constants.callbacks.CANCEL_POST))
 async def publish_command(query: CallbackQuery):
     await channel_menu(query)
 
 # Обработчик команды /button
-@dp.message(Command('button'), StateFilter('writing_post'))
+@dp.message(Command('button'), StateFilter(constants.states.WRITING_POST))
 async def publish_command(message: Message):
     args = message.text.split()
     if len(args) < 3:
@@ -71,7 +72,7 @@ async def publish_command(message: Message):
     await answer(message, text, reply_markup=create_write_keyboard().as_markup())
 
 # Обработчик команды /schedule
-@dp.message(Command('schedule'), StateFilter('writing_post'))
+@dp.message(Command('schedule'), StateFilter(constants.states.WRITING_POST))
 async def publish_command(message: Message):
     if states[get_user_id(message)].post.is_empty():
         await message.reply("Пост пустой.")
@@ -85,20 +86,20 @@ async def publish_command(message: Message):
     await channel_menu(message)
 
 # При нажатие на переписать пост
-@dp.callback_query(StateFilter('writing_post'), CallbackFilter('rewrite_post'))
+@dp.callback_query(StateFilter(constants.states.WRITING_POST), CallbackFilter(constants.callbacks.CLEAR_POST))
 async def rewrite_post_callback(query: CallbackQuery):
     states[get_user_id(query)].post = Post()
     await answer(query, text="Отправьте новый текст или файлы для изменения поста.", reply_markup=create_write_keyboard().as_markup())
 
 # Обработчик текстовых сообщений
-@dp.message(F.text, StateFilter('writing_post'))
+@dp.message(F.text, StateFilter(constants.states.WRITING_POST))
 async def handle_text(message: Message):
     states[get_user_id(message)].post.text = message.html_text
     # Здесь можно добавить логику для сохранения текста и предварительного просмотра
     await answer(message, text="Текст получен. Отправьте медиафайлы.", reply_markup=create_write_keyboard().as_markup())
 
 # Обработчик фоток
-@dp.message(F.photo, StateFilter('writing_post'))
+@dp.message(F.photo, StateFilter(constants.states.WRITING_POST))
 async def handle_media(message: Message):
     try:
         states[get_user_id(message)].post.add_media(('photo', message.photo[-1].file_id))
@@ -109,7 +110,7 @@ async def handle_media(message: Message):
     await answer(message, text="Медиафайл получен. Готов к публикации.", reply_markup=create_write_keyboard().as_markup())
 
 # Обработчик документов
-@dp.message(F.document, StateFilter('writing_post'))
+@dp.message(F.document, StateFilter(constants.states.WRITING_POST))
 async def handle_media(message: Message):
     try:
         states[get_user_id(message)].post.add_media(('document', message.document.file_id))
@@ -120,7 +121,7 @@ async def handle_media(message: Message):
     await answer(message, text="Документ получен. Готов к публикации.", reply_markup=create_write_keyboard().as_markup())
 
 # Обработчик документов
-@dp.message(F.video, StateFilter('writing_post'))
+@dp.message(F.video, StateFilter(constants.states.WRITING_POST))
 async def handle_media(message: Message):
     try:
         states[get_user_id(message)].post.add_media(('video', message.video.file_id))
