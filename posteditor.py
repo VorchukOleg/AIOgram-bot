@@ -153,3 +153,10 @@ async def handle_media(message: Message):
         return
     # Здесь можно добавить логику для сохранения медиафайлов и предварительного просмотра
     await answer(message, text="Видео получен. Готов к публикации.", reply_markup=create_write_keyboard(message).as_markup())
+
+# Обработчик при удаление
+@dp.callback_query(StateFilter(constants.states.WRITING_POST), CallbackFilter(constants.callbacks.DELETE_POST))
+async def delete_post_callback(query: CallbackQuery):
+    delete_schedule(states[get_user_id(query)].schedule_id)
+    await answer(query, "Пост удален.")
+    await channel_menu(query)
