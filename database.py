@@ -28,11 +28,15 @@ class Schedule(BaseModel):
     class Meta:
         table_name = 'Schedule'
 
+class AlreadyLinked(Exception):
+    pass
 
 Linking.create_table(True)
 Schedule.create_table(True)
 
 def link_chat_to_user(user_id: int, chat_id: int):
+    if len(Linking.select().where(Linking.user_id == user_id)) > 0:
+        raise AlreadyLinked()
     Linking.create(user_id=user_id, chat_id=chat_id)
 
 async def get_links_of_user(user_id: int) -> list[Chat]:
