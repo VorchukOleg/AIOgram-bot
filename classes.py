@@ -23,11 +23,11 @@ class Post:
             keyboard = keyboard.row(*[InlineKeyboardButton(text=x[0], url=x[1]) for x in row])
         if len(self.media) == 1:
             if self.media[0][0] == 'photo':
-                await bot.send_photo(chat_id=chat_id, photo=self.media[0][1], caption=self.text, parse_mode='html', reply_markup=keyboard.as_markup())
+                return await bot.send_photo(chat_id=chat_id, photo=self.media[0][1], caption=self.text, parse_mode='html', reply_markup=keyboard.as_markup())
             elif self.media[0][0] == 'document':
-                await bot.send_document(chat_id=chat_id, document=self.media[0][1], caption=self.text, parse_mode='html', reply_markup=keyboard.as_markup())
+                return await bot.send_document(chat_id=chat_id, document=self.media[0][1], caption=self.text, parse_mode='html', reply_markup=keyboard.as_markup())
             elif self.media[0][0] == 'video':
-                await bot.send_video(chat_id=chat_id, video=self.media[0][1], caption=self.text, parse_mode='html', reply_markup=keyboard.as_markup())
+                return await bot.send_video(chat_id=chat_id, video=self.media[0][1], caption=self.text, parse_mode='html', reply_markup=keyboard.as_markup())
         elif len(self.media) > 1:
             media = []
             for x in self.media:
@@ -41,9 +41,9 @@ class Post:
                 if xt is not None:
                     media.append(xt)
             media[0].caption = self.text
-            await bot.send_media_group(chat_id, media)
+            return await bot.send_media_group(chat_id, media)
         else:
-            await bot.send_message(chat_id=chat_id, text=self.text, parse_mode='html', reply_markup=keyboard.as_markup())
+            return await bot.send_message(chat_id=chat_id, text=self.text, parse_mode='html', reply_markup=keyboard.as_markup())
     
     def add_media(self, media: tuple[str, str]):
         for x in self.media:
@@ -71,7 +71,7 @@ class Post:
         return post
 
     def __str__(self) -> str:
-        return f'({self.text or 'None'}, {self.photo}, {self.buttons})'
+        return f'({self.text or 'None'}, {self.media}, {self.buttons})'
     
     def __repr__(self) -> str:
         return self.__str__()
@@ -81,10 +81,19 @@ class State:
     chat_id: int | None = None
     post: Post | None = None
 
-    def __init__(self, status: str = '', chat_id: int | None = None, post: Post | None = None):
+    # Looking schedule
+    page: int | None = None
+
+    # Editing
+    schedule_id: int | None
+
+    def __init__(self, status: str = '', chat_id: int | None = None, post: Post | None = None,
+                 page: int | None = None, schedule_id: int | None= None):
         self.status = status
         self.chat_id = chat_id
         self.post = post
+        self.page = page
+        self.schedule_id = schedule_id
 
     def __str__(self) -> str:
         return f'({self.status}, {self.chat_id or 'None'}, {self.post or 'None'})'

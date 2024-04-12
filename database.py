@@ -82,3 +82,15 @@ def get_need_to_schedule(need_delete = False, chat_id: int | None = None):
             Schedule.delete().where(Schedule.id == schedule.id).execute()
         table.append((schedule.chat_id, schedule.date, Post.deserialize(schedule.post)))
     return table
+
+def get_schedule(chat_id: int, offset: int) -> tuple[int, Post, datetime] | None:
+    d = list(Schedule.select().where(Schedule.chat_id == chat_id).offset(offset - 1))
+    if len(d) == 0:
+        return None, None, None
+    return d[0].id, Post.deserialize(d[0].post), d[0].date
+
+def delete_schedule(schedule_id: int):
+    Schedule.delete().where(Schedule.id == schedule_id).execute()
+
+def update_schedule(schedule_id: int, post: Post, date: datetime):
+    Schedule.update(post=post.serialize(), date=date).where(Schedule.id == schedule_id).execute()
