@@ -1,4 +1,4 @@
-from aiogram import Bot, Dispatcher, types, F
+from aiogram import Bot, Dispatcher
 
 
 from config import TELEGRAM_TOKEN

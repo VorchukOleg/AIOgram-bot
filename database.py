@@ -92,8 +92,11 @@ def get_schedule(chat_id: int, offset: int) -> tuple[int, Post, datetime] | None
 def delete_schedule(schedule_id: int):
     Schedule.delete().where(Schedule.id == schedule_id).execute()
 
-def update_schedule(schedule_id: int, post: Post, date: datetime):
-    Schedule.update(post=post.serialize(), date=date).where(Schedule.id == schedule_id).execute()
+def update_schedule(schedule_id: int, post: Post | None, date: datetime | None):
+    if post is not None:
+        Schedule.update(post=post.serialize()).where(Schedule.id == schedule_id).execute()
+    if date is not None:
+        Schedule.update(date=date).where(Schedule.id == schedule_id).execute()
 
 def count_schedule(chat_id: int):
     return len(Schedule.select().where(Schedule.chat_id == chat_id))

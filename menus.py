@@ -9,6 +9,7 @@ from utils import get_user_id, answer, Context, CallbackFilter
 from classes import State
 from database import unlink_chat_from_user, get_links_of_user, get_schedule, count_schedule
 import constants
+import asyncio
 
 async def channel_menu(c: Context, chat_id: int | None = None):
     user_id = get_user_id(c)
@@ -42,6 +43,7 @@ async def looking_schedule_menu(c: Context):
     post_id, post, date = get_schedule(states[user_id].chat_id, states[user_id].page)
     if post == None:
         await answer(c, text='Нет отложенных записей 😋')
+        await asyncio.sleep(1)
         await channel_menu(c)
         return
     await c.message.delete()

@@ -3,6 +3,7 @@ from aiogram.types import Message, InlineKeyboardButton, CallbackQuery
 from aiogram.filters import Command
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram import F
+import asyncio
 
 from globals import *
 from state import states, StateFilter
@@ -15,10 +16,13 @@ import constants
 # Генерации клавиатуру для редактирование
 def create_write_keyboard(c: Context):
     keyboard = InlineKeyboardBuilder()
-    keyboard = keyboard.row(InlineKeyboardButton(text='📰 Опубликовать', callback_data=constants.callbacks.PUBLISH_POST), InlineKeyboardButton(text='👁️ Предпросмотр', callback_data=constants.callbacks.PREVIEW_POST))
+    if states[get_user_id(c)].schedule_id is not None:
+        keyboard = keyboard.row(InlineKeyboardButton(text='📰 Опубликовать прямо сейчас', callback_data=constants.callbacks.PUBLISH_POST), InlineKeyboardButton(text='👁️ Предпросмотр', callback_data=constants.callbacks.PREVIEW_POST))
+    else:
+        keyboard = keyboard.row(InlineKeyboardButton(text='📰 Опубликовать', callback_data=constants.callbacks.PUBLISH_POST), InlineKeyboardButton(text='👁️ Предпросмотр', callback_data=constants.callbacks.PREVIEW_POST))
     keyboard = keyboard.row(InlineKeyboardButton(text='🩹 Очистить', callback_data=constants.callbacks.CLEAR_POST))
     if states[get_user_id(c)].schedule_id is not None:
-        keyboard = keyboard.row(InlineKeyboardButton(text='🗑️ Удалить', callback_data=constants.callbacks.DELETE_POST))
+        keyboard = keyboard.row(InlineKeyboardButton(text='💾 Сохранить', callback_data=constants.callbacks.SAVE_POST), InlineKeyboardButton(text='🗑️ Удалить', callback_data=constants.callbacks.DELETE_POST))
     keyboard = keyboard.row(InlineKeyboardButton(text='❌ Отмена', callback_data=constants.callbacks.CANCEL))
     return keyboard
 
@@ -30,7 +34,7 @@ async def write_post_callback(query: CallbackQuery):
         chat_id=states[get_user_id(query)].chat_id,
         post=Post()
     )
-    await answer(query, text='👍 Режим написание поста\n\nОтправьте фото или текст\n\n', reply_markup=create_write_keyboard(query).as_markup())
+    await answer(query, text='👍 Режим написание поста\n\nОтправьте фото или текст\n\n/button - Добавить кнопку в пост\n/schedule - Отправить пост в отложенные\n\n', reply_markup=create_write_keyboard(query).as_markup())
 
 # Функция при нажатие для редактирование поста
 @dp.callback_query(CallbackFilter(constants.callbacks.EDIT_POST), StateFilter(constants.states.LOOKING_SCHEDULE))
@@ -106,7 +110,19 @@ async def publish_command(message: Message):
     else:
         update_schedule(states[get_user_id(message)].schedule_id, states[get_user_id(message)].post, parse_date(' '.join(args[1:])))
         await answer(message, "⌚ Пост перезапланирован!")
+    await asyncio.sleep(1)
     await channel_menu(message)
+
+# Обработчик сохранение поста
+@dp.callback_query(StateFilter(constants.states.WRITING_POST), CallbackFilter(constants.callbacks.SAVE_POST))
+async def save_callback(query: CallbackQuery):
+    if states[get_user_id(query)].post.is_empty():
+        await answer(query, "Пост пустой.", reply_markup=create_write_keyboard(query).as_markup())
+        return
+    update_schedule(states[get_user_id(query)].schedule_id, states[get_user_id(query)].post, None)
+    await answer(query, "💾 Пост сохранён!")
+    await asyncio.sleep(1)
+    await channel_menu(query)
 
 # При нажатие на переписать пост
 @dp.callback_query(StateFilter(constants.states.WRITING_POST), CallbackFilter(constants.callbacks.CLEAR_POST))
