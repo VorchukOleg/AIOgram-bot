@@ -20,7 +20,7 @@ async def channel_menu(c: Context, chat_id: int | None = None):
     )
     chat = await bot.get_chat(states[user_id].chat_id)
     keyboard = InlineKeyboardBuilder()
-    keyboard = keyboard.row(InlineKeyboardButton(text='✍️ Написать новый пост', callback_data=constants.callbacks.WRITE_POST))
+    keyboard = keyboard.row(InlineKeyboardButton(text='✍️ Написать новый пост', callback_data=constants.callbacks.WritePost(chat_id=states[user_id].chat_id, edit_mode=False, schedule_id=None).pack()))
     keyboard = keyboard.row(InlineKeyboardButton(text='🕛 Отложенные', callback_data=constants.callbacks.LOOK_SCHEDULE))
     keyboard = keyboard.row(InlineKeyboardButton(text='❌ Отвязать', callback_data=constants.callbacks.UNLINK_CHANNEL))
     keyboard = keyboard.row(InlineKeyboardButton(text='📚 Каналы', callback_data=constants.callbacks.CHANNELS))
@@ -34,7 +34,7 @@ async def unlink_channel_callback(query: CallbackQuery):
 
 async def looking_schedule_menu(c: Context):
     user_id = get_user_id(c)
-    post_id, post, date = get_schedule(states[user_id].chat_id, states[user_id].page)
+    schedule_id, post, date = get_schedule(states[user_id].chat_id, states[user_id].page)
     if post == None:
         await answer(c, text='Нет отложенных записей 😋')
         await asyncio.sleep(1)
@@ -44,7 +44,7 @@ async def looking_schedule_menu(c: Context):
     await post.send(user_id)
     count = count_schedule(states[user_id].chat_id)
     keyboard = InlineKeyboardBuilder()
-    keyboard = keyboard.row(InlineKeyboardButton(text='✍️ Отредактировать', callback_data=constants.callbacks.EDIT_POST))
+    keyboard = keyboard.row(InlineKeyboardButton(text='✍️ Отредактировать', callback_data=constants.callbacks.WritePost(chat_id=states[user_id].chat_id, edit_mode=True, schedule_id=schedule_id).pack()))
     if states[user_id].page + 1 <= count:
         keyboard = keyboard.row(InlineKeyboardButton(text='⏭ Дальше', callback_data=constants.callbacks.NEXT_POST))
     if states[user_id].page - 1 >= 1:

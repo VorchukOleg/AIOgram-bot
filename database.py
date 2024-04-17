@@ -89,6 +89,12 @@ def get_schedule(chat_id: int, offset: int) -> tuple[int, Post, datetime] | None
         return None, None, None
     return d[0].id, Post.deserialize(d[0].post), d[0].date
 
+def get_schedule_direct(schedule_id: int) -> tuple[int, Post, datetime] | None:
+    d = list(Schedule.select().where(Schedule.id == schedule_id))
+    if len(d) == 0:
+        return None, None, None
+    return d[0].id, Post.deserialize(d[0].post), d[0].date 
+
 def delete_schedule(schedule_id: int):
     Schedule.delete().where(Schedule.id == schedule_id).execute()
 

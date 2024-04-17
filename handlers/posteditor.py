@@ -1,180 +1,176 @@
 from aiogram import F
-from aiogram.types import Message, InlineKeyboardButton, CallbackQuery
+from aiogram.types import Message, InlineKeyboardButton, CallbackQuery, KeyboardButton
 from aiogram.filters import Command
-from aiogram.utils.keyboard import InlineKeyboardBuilder
+from aiogram.filters.state import State
+from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardBuilder
 from aiogram import F
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State
+from classes.post import Post
+from utils import answer
 import asyncio
 
 from globals import *
-from classes.statemanager import states, StateFilter
-from database import add_schedule, get_schedule, delete_schedule, update_schedule
-from utils import CallbackFilter, get_user_id, answer, parse_date, Context
-from classes.post import Post
-from classes.state import State
-from classes.exceptions import CantBeMixed
-from .channel import channel_menu
 import constants
+from database import delete_schedule, add_schedule, update_schedule, get_schedule_direct
+from .channel import channel_menu
+from utils import parse_date
+from classes.exceptions import CantBeMixed
 
-# Генерации клавиатуру для редактирование
-def create_write_keyboard(c: Context):
+postState = State('post', 'posteditor')
+scheduleState = State('scheduleState', 'posteditor')
+
+async def create_write_keyboard(state: FSMContext):
+    edit_mode = (await state.get_data())['edit_mode']
     keyboard = InlineKeyboardBuilder()
-    if states[get_user_id(c)].schedule_id is not None:
-        keyboard = keyboard.row(InlineKeyboardButton(text='📰 Опубликовать прямо сейчас', callback_data=constants.callbacks.PUBLISH_POST), InlineKeyboardButton(text='👁️ Предпросмотр', callback_data=constants.callbacks.PREVIEW_POST))
-    else:
-        keyboard = keyboard.row(InlineKeyboardButton(text='📰 Опубликовать', callback_data=constants.callbacks.PUBLISH_POST), InlineKeyboardButton(text='👁️ Предпросмотр', callback_data=constants.callbacks.PREVIEW_POST))
-    keyboard = keyboard.row(InlineKeyboardButton(text='🩹 Очистить', callback_data=constants.callbacks.CLEAR_POST))
-    if states[get_user_id(c)].schedule_id is not None:
+    if edit_mode:
+        keyboard = keyboard.row(InlineKeyboardButton(text='📰 Опубликовать прямо сейчас', callback_data=constants.callbacks.PUBLISH_POST))
+        keyboard = keyboard.row(InlineKeyboardButton(text='⌚ Переотложить', callback_data=constants.callbacks.SCHEDULE))
         keyboard = keyboard.row(InlineKeyboardButton(text='💾 Сохранить', callback_data=constants.callbacks.SAVE_POST), InlineKeyboardButton(text='🗑️ Удалить', callback_data=constants.callbacks.DELETE_POST))
+    else:
+        keyboard = keyboard.row(InlineKeyboardButton(text='📰 Опубликовать', callback_data=constants.callbacks.PUBLISH_POST))
+        keyboard = keyboard.row(InlineKeyboardButton(text='⌚ Отложить запись', callback_data=constants.callbacks.SCHEDULE))
     keyboard = keyboard.row(InlineKeyboardButton(text='❌ Отмена', callback_data=constants.callbacks.CANCEL))
     return keyboard
 
-# Функция при нажатие для созданиие поста
-@dp.callback_query(CallbackFilter(constants.callbacks.WRITE_POST), StateFilter(constants.states.CHANNEL))
-async def write_post_callback(query: CallbackQuery): 
-    states[get_user_id(query)] = State(
-        constants.states.WRITING_POST,
-        chat_id=states[get_user_id(query)].chat_id,
-        post=Post()
-    )
-    await answer(query, text='👍 Режим написание поста\n\nОтправьте фото или текст\n\n/button - Добавить кнопку в пост\n/schedule - Отправить пост в отложенные\n\n', reply_markup=create_write_keyboard(query).as_markup())
-
-# Функция при нажатие для редактирование поста
-@dp.callback_query(CallbackFilter(constants.callbacks.EDIT_POST), StateFilter(constants.states.LOOKING_SCHEDULE))
-async def write_post_callback(query: CallbackQuery):
-    schedule_id, post, _ = get_schedule(states[get_user_id(query)].chat_id, states[get_user_id(query)].page)
-    states[get_user_id(query)] = State(
-        constants.states.WRITING_POST,
-        chat_id=states[get_user_id(query)].chat_id,
-        post=post,
-        schedule_id=schedule_id,
-    )
-    await answer(query, text='👁️ Режим редактирование поста', reply_markup=create_write_keyboard(query).as_markup())
-
-
-# функция для показа текущего поста
-@dp.callback_query(StateFilter(constants.states.WRITING_POST), CallbackFilter(constants.callbacks.PREVIEW_POST))
-async def show_current_post(query: CallbackQuery):
-    if states[get_user_id(query)].post.is_empty():
-        await answer(query, "Пост пустой.", reply_markup=create_write_keyboard(query).as_markup())
-        return
+@dp.callback_query(constants.callbacks.WritePost.filter())
+async def write_post_callback(query: CallbackQuery, state: FSMContext, callback_data: constants.callbacks.WritePost):
+    await state.set_state(postState)
+    post: Post
+    if callback_data.edit_mode:
+        _, post, _ = get_schedule_direct(callback_data.schedule_id)
     else:
-        await query.answer()
-    await states[get_user_id(query)].post.send(get_user_id(query))
-    await bot.send_message(chat_id=get_user_id(query), text='👁️ Предпросмотр', reply_markup=create_write_keyboard(query).as_markup())
+        post = Post()
+    await state.set_data({
+        'post': post,
+        'chat_id': callback_data.chat_id,
+        'edit_mode': callback_data.edit_mode,
+        'schedule_id': callback_data.schedule_id,
+    })
+    if not callback_data.edit_mode:
+        await answer(query, text='👍 Режим написание поста\n\nОтправьте фото или текст\n\n', reply_markup=(await create_write_keyboard(state)).as_markup())
+    else:
+        await post.send(query.from_user.id, buttons=await create_write_keyboard(state))
+@dp.callback_query(postState, F.data == constants.callbacks.CANCEL)
+async def cancel_callback(query: CallbackQuery, state: FSMContext):
+    chat_id = (await state.get_data())['chat_id']
+    await state.clear()
+    await channel_menu(query, chat_id)
 
-# Обработчик команды /publish
-@dp.callback_query(StateFilter(constants.states.WRITING_POST), CallbackFilter(constants.callbacks.PUBLISH_POST))
-async def publish_command(query: CallbackQuery):
-    if states[get_user_id(query)].post.is_empty():
-        await answer(query, "Пост пустой.", reply_markup=create_write_keyboard(query).as_markup())
+@dp.callback_query(postState, F.data == constants.callbacks.PUBLISH_POST)
+async def publish_command(query: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    post: Post = data['post']
+    chat_id = data['chat_id']
+    if post.is_empty():
+        await answer(query, "Пост пустой.", reply_markup=(await create_write_keyboard(state)).as_markup())
         return
     # Здесь можно добавить логику для публикации сохранённого поста
     await answer(query, "Пост опубликован.")
 
-    await states[get_user_id(query)].post.send(states[get_user_id(query)].chat_id)
-    if states[get_user_id(query)].schedule_id is not None:
-        delete_schedule(states[get_user_id(query)].schedule_id)
+    await post.send(chat_id)
+    if data['edit_mode']:
+        delete_schedule(data['schedule_id'])
     
-    await channel_menu(query)
-    
-
-# Обработчик команды /cancel
-@dp.callback_query(StateFilter(constants.states.WRITING_POST), CallbackFilter(constants.callbacks.CANCEL))
-async def publish_command(query: CallbackQuery):
-    await channel_menu(query)
-
-# Обработчик команды /button
-@dp.message(Command('button'), StateFilter(constants.states.WRITING_POST))
-async def publish_command(message: Message):
-    args = message.text.split()
-    if len(args) < 3:
-        await answer(message, "❓Как добавить кнопку\n\nПример:\n/button https://bmstu.ru Сайт МГТУ им Н. Э. Баумана")
-        return
-    states[get_user_id(message)].post.buttons.append([(' '.join(args[2:]), args[1])])
-    text = '➕ Кнопка добавлена'
-    if len(states[get_user_id(message)].post.media) > 1:
-        text += '\n\nP.S. Инлайн Кнопки не поддерживается при множественных медиа - Ограничение Telegram 😒'
-    await answer(message, text, reply_markup=create_write_keyboard(message).as_markup())
-
-# Обработчик команды /schedule
-@dp.message(Command('schedule'), StateFilter(constants.states.WRITING_POST))
-async def publish_command(message: Message):
-    if states[get_user_id(message)].post.is_empty():
-        await message.reply("Пост пустой.")
-        return
-    args = message.text.split()
-    if len(args) < 2 or parse_date(' '.join(args[1:])) is None:
-        await answer(message, "❓Как отложить пост\n\nПример:\n/schedule 31.12.2024 23:59")
-        return
-    if states[get_user_id(message)].schedule_id is None:
-        add_schedule(states[get_user_id(message)].chat_id, parse_date(' '.join(args[1:])), states[get_user_id(message)].post)
-        await answer(message, "⌚ Пост запланирован!")
-    else:
-        update_schedule(states[get_user_id(message)].schedule_id, states[get_user_id(message)].post, parse_date(' '.join(args[1:])))
-        await answer(message, "⌚ Пост перезапланирован!")
     await asyncio.sleep(1)
-    await channel_menu(message)
+    await state.clear()
+    await channel_menu(query, chat_id=chat_id)
 
-# Обработчик сохранение поста
-@dp.callback_query(StateFilter(constants.states.WRITING_POST), CallbackFilter(constants.callbacks.SAVE_POST))
-async def save_callback(query: CallbackQuery):
-    if states[get_user_id(query)].post.is_empty():
-        await answer(query, "Пост пустой.", reply_markup=create_write_keyboard(query).as_markup())
-        return
-    update_schedule(states[get_user_id(query)].schedule_id, states[get_user_id(query)].post, None)
-    await answer(query, "💾 Пост сохранён!")
-    await asyncio.sleep(1)
-    await channel_menu(query)
+@dp.message(F.text, postState)
+async def handle_text(message: Message, state: FSMContext):
+    post: Post = (await state.get_data())['post']
+    post.text = message.html_text
+    await post.send(message.chat.id, buttons=await create_write_keyboard(state))
 
-# При нажатие на переписать пост
-@dp.callback_query(StateFilter(constants.states.WRITING_POST), CallbackFilter(constants.callbacks.CLEAR_POST))
-async def rewrite_post_callback(query: CallbackQuery):
-    states[get_user_id(query)].post = Post()
-    await answer(query, text="Отправьте новый текст или файлы для изменения поста.", reply_markup=create_write_keyboard(query).as_markup())
-
-# Обработчик текстовых сообщений
-@dp.message(F.text, StateFilter(constants.states.WRITING_POST))
-async def handle_text(message: Message):
-    states[get_user_id(message)].post.text = message.html_text
-    # Здесь можно добавить логику для сохранения текста и предварительного просмотра
-    await answer(message, text="Текст получен. Отправьте медиафайлы.", reply_markup=create_write_keyboard(message).as_markup())
-
-# Обработчик фоток
-@dp.message(F.photo, StateFilter(constants.states.WRITING_POST))
-async def handle_media(message: Message):
+@dp.message(F.photo, postState)
+async def handle_photo(message: Message, state: FSMContext):
+    post: Post = (await state.get_data())['post']
     try:
-        states[get_user_id(message)].post.add_media(('photo', message.photo[-1].file_id))
+        post.add_media(('photo', message.photo[-1].file_id))
     except CantBeMixed:
         await answer(message, text="Невозможно добавить фотографию, так как уже прикреплен медиа другого типа", reply_markup=create_write_keyboard(message).as_markup())
         return
-    # Здесь можно добавить логику для сохранения медиафайлов и предварительного просмотра
-    await answer(message, text="Медиафайл получен. Готов к публикации.", reply_markup=create_write_keyboard(message).as_markup())
+    await post.send(message.chat.id, buttons=await create_write_keyboard(state))
 
-# Обработчик документов
-@dp.message(F.document, StateFilter(constants.states.WRITING_POST))
-async def handle_media(message: Message):
+@dp.message(F.document, postState)
+async def handle_photo(message: Message, state: FSMContext):
+    post: Post = (await state.get_data())['post']
     try:
-        states[get_user_id(message)].post.add_media(('document', message.document.file_id))
+        post.add_media(('document', message.document.file_id))
     except CantBeMixed:
         await answer(message, text="Невозможно добавить документ, так как уже прикреплен медиа другого типа", reply_markup=create_write_keyboard(message).as_markup())
         return
-    # Здесь можно добавить логику для сохранения медиафайлов и предварительного просмотра
-    await answer(message, text="Документ получен. Готов к публикации.", reply_markup=create_write_keyboard(message).as_markup())
+    await post.send(message.chat.id, buttons=await create_write_keyboard(state))
 
-# Обработчик документов
-@dp.message(F.video, StateFilter(constants.states.WRITING_POST))
-async def handle_media(message: Message):
+@dp.message(F.video, postState)
+async def handle_photo(message: Message, state: FSMContext):
+    post: Post = (await state.get_data())['post']
     try:
-        states[get_user_id(message)].post.add_media(('video', message.video.file_id))
+        post.add_media(('video', message.video.file_id))
     except CantBeMixed:
         await answer(message, text="Невозможно добавить видео, так как уже прикреплен медиа другого типа", reply_markup=create_write_keyboard(message).as_markup())
         return
-    # Здесь можно добавить логику для сохранения медиафайлов и предварительного просмотра
-    await answer(message, text="Видео получен. Готов к публикации.", reply_markup=create_write_keyboard(message).as_markup())
+    await post.send(message.chat.id, buttons=await create_write_keyboard(state))
 
-# Обработчик при удаление
-@dp.callback_query(StateFilter(constants.states.WRITING_POST), CallbackFilter(constants.callbacks.DELETE_POST))
-async def delete_post_callback(query: CallbackQuery):
-    delete_schedule(states[get_user_id(query)].schedule_id)
+@dp.callback_query(F.data == constants.callbacks.SCHEDULE, postState)
+async def publish_command(query: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    post = data['post']
+    if post.is_empty():
+        await answer(query, "Пост пустой.", reply_markup=(await create_write_keyboard(state)).as_markup())
+        return
+    await state.set_state(scheduleState)
+    await state.set_data(data)
+    await answer(query, "❓Как отложить пост\n\nПример:\n`31.12.2024 23:59`\n\nИли напишите /cancel - для отмены")
+
+@dp.message(scheduleState, Command('cancel'))
+async def publish_command(message: Message, state: FSMContext):
+    data = await state.get_data()
+    post: Post = data['post']
+    await state.set_state(postState)
+    await state.set_data(data)
+    await post.send(message.chat.id, buttons=await create_write_keyboard(state))
+
+@dp.message(F.text, scheduleState)
+async def publish_command(message: Message, state: FSMContext):
+    data = await state.get_data()
+    post: Post = data['post']
+    chat_id = data['chat_id']
+    schedule_id = data['schedule_id']
+    edit_mode = data['edit_mode']
+    if parse_date(message.text) is None:
+        await answer(message, "❓Как отложить пост\n\nПример:\n`31.12.2024 23:59`")
+        return
+    if not edit_mode:
+        add_schedule(chat_id, parse_date(message.text), post)
+        await answer(message, "⌚ Пост запланирован!")
+    else:
+        update_schedule(schedule_id, post, parse_date(message.text))
+        await answer(message, "⌚ Пост перезапланирован!")
+    await asyncio.sleep(1)
+    await state.clear()
+    await channel_menu(message)
+
+@dp.callback_query(postState, F.data == constants.callbacks.DELETE_POST)
+async def delete_post_callback(query: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    schedule_id = data['schedule_id']
+    delete_schedule(schedule_id)
     await answer(query, "Пост удален.")
+    await asyncio.sleep(1)
+    await state.clear()
+    await channel_menu(query)
+
+@dp.callback_query(postState, F.data == constants.callbacks.SAVE_POST)
+async def save_callback(query: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    schedule_id = data['schedule_id']
+    post = data['post']
+    if post.is_empty():
+        await answer(query, "Пост пустой.")
+        return
+    update_schedule(schedule_id, post, None)
+    await answer(query, "💾 Пост сохранён!")
+    await asyncio.sleep(1)
+    await state.clear()
     await channel_menu(query)

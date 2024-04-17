@@ -41,8 +41,12 @@ def get_user_id(c: CallbackQuery | Message) -> int:
 async def answer(c: CallbackQuery | Message, *args, **kwargs):
     try:
         if isinstance(c, CallbackQuery):
-            await c.message.edit_text(*args, **kwargs)
-        elif c.from_user.id == bot.id:
+            if c.message.photo or c.message.video or c.message.document:
+                await c.answer()
+                await bot.send_message(c.from_user.id, *args, **kwargs)
+            else:
+                await c.message.edit_text(*args, **kwargs)
+        elif c.from_user.id == bot.id and not (c.photo or c.video or c.document):
             await c.edit_text(*args, **kwargs)
         else:
             await c.answer(*args, **kwargs)

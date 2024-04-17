@@ -15,10 +15,12 @@ class Post:
         self.media = []
         self.buttons = []
 
-    async def send(self, chat_id: int, bot: Bot = bot):
+    async def send(self, chat_id: int, bot: Bot = bot, buttons: InlineKeyboardBuilder | None = None):
         keyboard = InlineKeyboardBuilder()
         for row in self.buttons:
             keyboard = keyboard.row(*[InlineKeyboardButton(text=x[0], url=x[1]) for x in row])
+        if buttons is not None:
+            keyboard = keyboard.attach(buttons)
         if len(self.media) == 1:
             if self.media[0][0] == 'photo':
                 return await bot.send_photo(chat_id=chat_id, photo=self.media[0][1], caption=self.text, parse_mode='html', reply_markup=keyboard.as_markup())
@@ -48,6 +50,9 @@ class Post:
             if x[0] != media[0]:
                 raise CantBeMixed()
         self.media.append(media)
+
+    def set_media(self, media: tuple[str, str]):
+        self.media = [media]
     
     def is_empty(self):
         return self.text == '' and len(self.media) == 0
