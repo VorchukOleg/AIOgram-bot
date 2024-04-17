@@ -2,7 +2,7 @@ from aiogram.types import InlineKeyboardButton, CallbackQuery
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from globals import *
-from state import delete_state
+from classes.statemanager import delete_state
 from utils import get_user_id, answer, Context, CallbackFilter
 from database import get_links_of_user
 import constants

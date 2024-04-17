@@ -6,10 +6,12 @@ from aiogram import F
 import asyncio
 
 from globals import *
-from state import states, StateFilter
+from classes.statemanager import states, StateFilter
 from database import add_schedule, get_schedule, delete_schedule, update_schedule
 from utils import CallbackFilter, get_user_id, answer, parse_date, Context
-from classes import Post, CantBeMixed, State
+from classes.post import Post
+from classes.state import State
+from classes.exceptions import CantBeMixed
 from .channel import channel_menu
 import constants
 

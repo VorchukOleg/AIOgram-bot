@@ -5,10 +5,10 @@ from aiogram import F
 import asyncio
 
 from globals import *
-from state import states, StateFilter, delete_state
+from classes.statemanager import states, StateFilter
 from utils import get_user_id, answer, Context, CallbackFilter
-from classes import State
-from database import unlink_chat_from_user, get_links_of_user, get_schedule, count_schedule, is_linked
+from classes.state import State
+from database import unlink_chat_from_user, get_schedule, count_schedule, is_linked
 from .channels import channels_menu
 import constants
 

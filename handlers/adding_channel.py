@@ -2,10 +2,10 @@ from aiogram.types import Message, InlineKeyboardButton, CallbackQuery
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from globals import *
-from state import states, StateFilter
+from classes.statemanager import states, StateFilter
 from database import link_chat_to_user, AlreadyLinked
 from utils import CallbackFilter, is_user_admin, get_user_id
-from classes import State
+from classes.state import State
 import constants
 
 # Функция при нажатие кнопки (при получение callback query если в нём query.data == 'add_channel')

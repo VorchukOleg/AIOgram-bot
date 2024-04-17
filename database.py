@@ -2,7 +2,7 @@ from peewee import *
 from globals import bot
 from utils import is_user_admin, Chat
 from aiogram.exceptions import TelegramForbiddenError
-from classes import Post
+from classes.post import Post
 from datetime import datetime
 
 conn = SqliteDatabase('storage.db')

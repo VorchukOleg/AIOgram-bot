@@ -2,10 +2,8 @@ from globals import bot
 from aiogram import Bot
 from aiogram.types import InputMediaPhoto, InlineKeyboardButton, InputMediaDocument, InputMediaVideo
 from aiogram.utils.keyboard import InlineKeyboardBuilder
+from .exceptions import CantBeMixed
 import json
-
-class CantBeMixed(Exception):
-    pass
 
 class Post:
     text: str
@@ -75,25 +73,3 @@ class Post:
     
     def __repr__(self) -> str:
         return self.__str__()
-
-class State:
-    status: str 
-    chat_id: int | None = None
-    post: Post | None = None
-
-    # Looking schedule
-    page: int | None = None
-
-    # Editing
-    schedule_id: int | None
-
-    def __init__(self, status: str = '', chat_id: int | None = None, post: Post | None = None,
-                 page: int | None = None, schedule_id: int | None= None):
-        self.status = status
-        self.chat_id = chat_id
-        self.post = post
-        self.page = page
-        self.schedule_id = schedule_id
-
-    def __str__(self) -> str:
-        return f'({self.status}, {self.chat_id or 'None'}, {self.post or 'None'})'

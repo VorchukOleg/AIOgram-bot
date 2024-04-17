@@ -1,4 +1,4 @@
-from classes import State
+from .state import State
 from utils import Context, get_user_id
 
 states: dict[str, State] = {}

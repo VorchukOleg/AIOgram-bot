@@ -4,7 +4,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram import F
 
 from globals import *
-from state import delete_state
+from classes.statemanager import delete_state
 from utils import CallbackFilter, answer
 import constants
 
