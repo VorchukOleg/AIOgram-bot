@@ -58,6 +58,7 @@ async def write_post_callback(query: CallbackQuery, state: FSMContext, callback_
     if not callback_data.edit_mode:
         await answer(query, text='👍 Режим написание поста\n\nОтправьте фото или текст\n\n', reply_markup=(await create_write_keyboard(state)).as_markup())
     else:
+        await query.answer()
         await post.send(query.from_user.id, buttons=await create_write_keyboard(state))
 
 @dp.callback_query(postState, F.data == constants.callbacks.CANCEL)
@@ -153,8 +154,7 @@ async def handle_photo(message: Message, state: FSMContext):
     try:
         post.add_media(('photo', message.photo[-1].file_id))
     except CantBeMixed:
-        await answer(message, text="Невозможно добавить фотографию, так как уже прикреплен медиа другого типа", reply_markup=create_write_keyboard(message).as_markup())
-        return
+        await answer(message, text="Невозможно добавить фотографию, так как уже прикреплен медиа другого типа")
     await post.send(message.chat.id, buttons=await create_write_keyboard(state))
 
 @dp.message(F.document, postState)
@@ -163,8 +163,7 @@ async def handle_photo(message: Message, state: FSMContext):
     try:
         post.add_media(('document', message.document.file_id))
     except CantBeMixed:
-        await answer(message, text="Невозможно добавить документ, так как уже прикреплен медиа другого типа", reply_markup=create_write_keyboard(message).as_markup())
-        return
+        await answer(message, text="Невозможно добавить документ, так как уже прикреплен медиа другого типа")
     await post.send(message.chat.id, buttons=await create_write_keyboard(state))
 
 @dp.message(F.video, postState)
@@ -173,8 +172,7 @@ async def handle_photo(message: Message, state: FSMContext):
     try:
         post.add_media(('video', message.video.file_id))
     except CantBeMixed:
-        await answer(message, text="Невозможно добавить видео, так как уже прикреплен медиа другого типа", reply_markup=create_write_keyboard(message).as_markup())
-        return
+        await answer(message, text="Невозможно добавить видео, так как уже прикреплен медиа другого типа")
     await post.send(message.chat.id, buttons=await create_write_keyboard(state))
 
 @dp.callback_query(F.data == constants.callbacks.SCHEDULE, postState)
