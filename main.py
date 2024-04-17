@@ -32,9 +32,9 @@ async def channels_callback(query: CallbackQuery):
     await channels_menu(query)
 
 # Функция управление привязанным каналом
-@dp.callback_query(lambda x: x.data.startswith(constants.callbacks.CHANNEL_PREFIX))
-async def channel_open_callback(query: CallbackQuery):
-    chat = await is_linked(query.from_user.id, int(query.data[len(constants.callbacks.CHANNEL_PREFIX):]))
+@dp.callback_query(constants.callbacks.Channel.filter())
+async def channel_open_callback(query: CallbackQuery, callback_data: constants.callbacks.Channel):
+    chat = await is_linked(query.from_user.id, callback_data.chat_id)
     keyboard = InlineKeyboardBuilder()
     if chat is None:
         keyboard = keyboard.row(InlineKeyboardButton(text='✍️ Каналы', callback_data=constants.callbacks.CHANNELS))

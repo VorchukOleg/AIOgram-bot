@@ -29,7 +29,7 @@ async def channels_menu(c: Context):
     keyboard = InlineKeyboardBuilder()
     delete_state(c)
     for linkedChat in await get_links_of_user(get_user_id(c)):
-        keyboard = keyboard.row(InlineKeyboardButton(text=linkedChat.full_name, callback_data=constants.callbacks.CHANNEL_PREFIX + str(linkedChat.id)))
+        keyboard = keyboard.row(InlineKeyboardButton(text=linkedChat.full_name, callback_data=constants.callbacks.Channel(chat_id=linkedChat.id).pack()))
     keyboard = keyboard.row(InlineKeyboardButton(text='➕ Добавить канал', callback_data=constants.callbacks.ADD_CHANNELS), InlineKeyboardButton(text='↩️ На главную', callback_data=constants.callbacks.MAIN))
     await answer(c, text='💻 Выберите канал', reply_markup=keyboard.as_markup())
 

@@ -1,6 +1,7 @@
+from aiogram.filters.callback_data import CallbackData
+
 CHANNELS = 'channels'
 ADD_CHANNELS = 'add_channel'
-CHANNEL_PREFIX = 'channel_'
 MAIN = 'main'
 UNLINK_CHANNEL = 'unlink_channel'
 WRITE_POST = 'write_post'
@@ -14,3 +15,6 @@ DELETE_POST = 'delete_post'
 NEXT_POST = 'next_post'
 PREVIOUS_POST = 'previous_post'
 SAVE_POST = 'save_post'
+
+class Channel(CallbackData, prefix='channel'):
+    chat_id: int
