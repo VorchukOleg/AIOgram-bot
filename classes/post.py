@@ -40,10 +40,12 @@ class Post:
                     xt = InputMediaVideo(media=x[1])
                 if xt is not None:
                     media.append(xt)
-            media[0].caption = self.text
-            return await bot.send_media_group(chat_id, media)
-        else:
-            return await bot.send_message(chat_id=chat_id, text=self.text, parse_mode='html', reply_markup=keyboard.as_markup())
+            if len(keyboard.as_markup().inline_keyboard) == 0:
+                media[0].caption = self.text
+                return await bot.send_media_group(chat_id, media)
+            await bot.send_media_group(chat_id, media)
+        if self.text or len(keyboard.as_markup().inline_keyboard) > 0:
+            return await bot.send_message(chat_id=chat_id, text=(self.text or '.'), parse_mode='html', reply_markup=keyboard.as_markup())
     
     def add_media(self, media: tuple[str, str]):
         for x in self.media:
