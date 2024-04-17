@@ -38,10 +38,13 @@ def get_user_id(c: CallbackQuery | Message) -> int:
         user_id = c.chat.id
     return user_id
 
+def is_media(c: Message) -> bool:
+    return c.photo is not None or c.video is not None or c.document is not None
+
 async def answer(c: CallbackQuery | Message, *args, **kwargs):
     try:
         if isinstance(c, CallbackQuery):
-            if c.message.photo or c.message.video or c.message.document:
+            if is_media(c.message):
                 await c.answer()
                 await bot.send_message(c.from_user.id, *args, **kwargs)
             else:

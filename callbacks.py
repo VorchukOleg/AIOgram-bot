@@ -23,3 +23,6 @@ class WritePost(CallbackData, prefix='channel_write_post'):
     chat_id: int
     edit_mode: bool
     schedule_id: int | None
+
+class EditCreatedPost(CallbackData, prefix='edit_post'):
+    chat_id: int

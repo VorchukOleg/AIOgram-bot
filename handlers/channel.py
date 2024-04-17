@@ -22,6 +22,7 @@ async def channel_menu(c: Context, chat_id: int | None = None):
     keyboard = InlineKeyboardBuilder()
     keyboard = keyboard.row(InlineKeyboardButton(text='✍️ Написать новый пост', callback_data=constants.callbacks.WritePost(chat_id=states[user_id].chat_id, edit_mode=False, schedule_id=None).pack()))
     keyboard = keyboard.row(InlineKeyboardButton(text='🕛 Отложенные', callback_data=constants.callbacks.LOOK_SCHEDULE))
+    keyboard = keyboard.row(InlineKeyboardButton(text='📝 Отредактировать существующий', callback_data=constants.callbacks.EditCreatedPost(chat_id=states[user_id].chat_id).pack()))
     keyboard = keyboard.row(InlineKeyboardButton(text='❌ Отвязать', callback_data=constants.callbacks.UNLINK_CHANNEL))
     keyboard = keyboard.row(InlineKeyboardButton(text='📚 Каналы', callback_data=constants.callbacks.CHANNELS))
     await answer(c, text='💻 Канал: ' + chat.full_name + '\n\nЧто вы хотите сделать?', reply_markup=keyboard.as_markup())
