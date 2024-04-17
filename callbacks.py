@@ -5,7 +5,6 @@ ADD_CHANNELS = 'add_channel'
 MAIN = 'main'
 UNLINK_CHANNEL = 'unlink_channel'
 PUBLISH_POST = 'publish_post'
-CLEAR_POST = 'clear_post'
 CANCEL = 'cancel'
 LOOK_SCHEDULE = 'look_schedule'
 DELETE_POST = 'delete_post'
@@ -13,6 +12,9 @@ NEXT_POST = 'next_post'
 PREVIOUS_POST = 'previous_post'
 SAVE_POST = 'save_post'
 SCHEDULE = 'schedule'
+SET_BUTTONS = 'set_buttons'
+CLEAR_MEDIA = 'clear_media'
+CLEAR_TEXT = 'clear_text'
 
 class Channel(CallbackData, prefix='channel'):
     chat_id: int

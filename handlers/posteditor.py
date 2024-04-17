@@ -19,9 +19,12 @@ from classes.exceptions import CantBeMixed
 
 postState = State('post', 'posteditor')
 scheduleState = State('scheduleState', 'posteditor')
+buttonsState = State('buttons', 'posteditor')
 
 async def create_write_keyboard(state: FSMContext):
-    edit_mode = (await state.get_data())['edit_mode']
+    data = await state.get_data()
+    edit_mode = data['edit_mode']
+    post: Post = data['post']
     keyboard = InlineKeyboardBuilder()
     if edit_mode:
         keyboard = keyboard.row(InlineKeyboardButton(text='📰 Опубликовать прямо сейчас', callback_data=constants.callbacks.PUBLISH_POST))
@@ -30,6 +33,11 @@ async def create_write_keyboard(state: FSMContext):
     else:
         keyboard = keyboard.row(InlineKeyboardButton(text='📰 Опубликовать', callback_data=constants.callbacks.PUBLISH_POST))
         keyboard = keyboard.row(InlineKeyboardButton(text='⌚ Отложить запись', callback_data=constants.callbacks.SCHEDULE))
+    if len(post.media) > 1 or (post.text and len(post.media) > 0):
+        keyboard = keyboard.row(InlineKeyboardButton(text='🧹 Очистить медиа', callback_data=constants.callbacks.CLEAR_MEDIA))
+    if len(post.media) > 0 and post.text:
+        keyboard = keyboard.row(InlineKeyboardButton(text='🧹 Очистить текст', callback_data=constants.callbacks.CLEAR_TEXT))
+    keyboard = keyboard.row(InlineKeyboardButton(text='⌨️ Установить кнопки', callback_data=constants.callbacks.SET_BUTTONS))
     keyboard = keyboard.row(InlineKeyboardButton(text='❌ Отмена', callback_data=constants.callbacks.CANCEL))
     return keyboard
 
@@ -75,6 +83,23 @@ async def publish_command(query: CallbackQuery, state: FSMContext):
     await asyncio.sleep(1)
     await state.clear()
     await channel_menu(query, chat_id=chat_id)
+
+@dp.callback_query(postState, F.data == constants.callbacks.CLEAR_TEXT)
+async def clear_text(query: CallbackQuery, state: FSMContext):
+    post: Post = (await state.get_data())['post']
+    post.text = None
+    await query.answer()
+    await post.send(query.from_user.id, buttons=await create_write_keyboard(state))
+
+@dp.callback_query(postState, F.data == constants.callbacks.CLEAR_MEDIA)
+async def clear_media(query: CallbackQuery, state: FSMContext):
+    post: Post = (await state.get_data())['post']
+    if post.text:
+        post.media = []
+    else:
+        post.media = [post.media[0]]
+    await query.answer()
+    await post.send(query.from_user.id, buttons=await create_write_keyboard(state))
 
 @dp.message(F.text, postState)
 async def handle_text(message: Message, state: FSMContext):
