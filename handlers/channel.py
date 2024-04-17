@@ -2,14 +2,15 @@ from aiogram import F
 from aiogram.types import InlineKeyboardButton, CallbackQuery
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram import F
+import asyncio
 
 from globals import *
 from state import states, StateFilter, delete_state
 from utils import get_user_id, answer, Context, CallbackFilter
 from classes import State
-from database import unlink_chat_from_user, get_links_of_user, get_schedule, count_schedule
+from database import unlink_chat_from_user, get_links_of_user, get_schedule, count_schedule, is_linked
+from .channels import channels_menu
 import constants
-import asyncio
 
 async def channel_menu(c: Context, chat_id: int | None = None):
     user_id = get_user_id(c)
@@ -25,13 +26,6 @@ async def channel_menu(c: Context, chat_id: int | None = None):
     keyboard = keyboard.row(InlineKeyboardButton(text='📚 Каналы', callback_data=constants.callbacks.CHANNELS))
     await answer(c, text='💻 Канал: ' + chat.full_name + '\n\nЧто вы хотите сделать?', reply_markup=keyboard.as_markup())
 
-async def channels_menu(c: Context):
-    keyboard = InlineKeyboardBuilder()
-    delete_state(c)
-    for linkedChat in await get_links_of_user(get_user_id(c)):
-        keyboard = keyboard.row(InlineKeyboardButton(text=linkedChat.full_name, callback_data=constants.callbacks.Channel(chat_id=linkedChat.id).pack()))
-    keyboard = keyboard.row(InlineKeyboardButton(text='➕ Добавить канал', callback_data=constants.callbacks.ADD_CHANNELS), InlineKeyboardButton(text='↩️ На главную', callback_data=constants.callbacks.MAIN))
-    await answer(c, text='💻 Выберите канал', reply_markup=keyboard.as_markup())
 
 @dp.callback_query(CallbackFilter(constants.callbacks.UNLINK_CHANNEL), StateFilter(constants.states.CHANNEL))
 async def unlink_channel_callback(query: CallbackQuery):
@@ -82,3 +76,13 @@ async def cancel_looking(query: CallbackQuery):
 @dp.callback_query(CallbackFilter(constants.callbacks.CANCEL), StateFilter(constants.states.LOOKING_SCHEDULE))
 async def cancel_looking(query: CallbackQuery):
     await channel_menu(query)
+
+@dp.callback_query(constants.callbacks.Channel.filter())
+async def channel_open_callback(query: CallbackQuery, callback_data: constants.callbacks.Channel):
+    chat = await is_linked(query.from_user.id, callback_data.chat_id)
+    keyboard = InlineKeyboardBuilder()
+    if chat is None:
+        keyboard = keyboard.row(InlineKeyboardButton(text='✍️ Каналы', callback_data=constants.callbacks.CHANNELS))
+        await query.message.edit_text(text='❌ Нет доступа', reply_markup=keyboard.as_markup())
+        return
+    await channel_menu(query, chat.id)
