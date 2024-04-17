@@ -57,10 +57,13 @@ async def get_links_of_user(user_id: int) -> list[Chat]:
 async def is_linked(user_id: int, chat_id: int) -> Chat | None:
     chat: Chat | None = None
     try:
+        # Вообще не уверен в плане этого кода
         chat = await bot.get_chat(chat_id)
-        if not (Linking.select().where(Linking.user_id == user_id).where(Linking.chat_id == chat_id)):
+        if len(Linking.select().where(Linking.user_id == user_id, Linking.chat_id == chat_id)) == 0:
             return None
         if await is_user_admin(user_id, chat) != 2:
+            d = list(Linking.select().where(Linking.user_id == user_id, Linking.chat_id == chat_id))
+            Linking.delete().where(Linking.id == d[0].id).execute()
             return None
     except TelegramForbiddenError:
         Linking.delete().where(Linking.chat_id == chat_id).execute()
