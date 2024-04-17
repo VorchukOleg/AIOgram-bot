@@ -37,7 +37,7 @@ async def create_write_keyboard(state: FSMContext):
         keyboard = keyboard.row(InlineKeyboardButton(text='🧹 Очистить медиа', callback_data=constants.callbacks.CLEAR_MEDIA))
     if len(post.media) > 0 and post.text:
         keyboard = keyboard.row(InlineKeyboardButton(text='🧹 Очистить текст', callback_data=constants.callbacks.CLEAR_TEXT))
-    keyboard = keyboard.row(InlineKeyboardButton(text='⌨️ Установить кнопки', callback_data=constants.callbacks.SET_BUTTONS))
+    keyboard = keyboard.row(InlineKeyboardButton(text='⌨️ Установить URL кнопки', callback_data=constants.callbacks.SET_BUTTONS))
     keyboard = keyboard.row(InlineKeyboardButton(text='❌ Отмена', callback_data=constants.callbacks.CANCEL))
     return keyboard
 
@@ -100,6 +100,45 @@ async def clear_media(query: CallbackQuery, state: FSMContext):
         post.media = [post.media[0]]
     await query.answer()
     await post.send(query.from_user.id, buttons=await create_write_keyboard(state))
+
+@dp.callback_query(postState, F.data == constants.callbacks.SET_BUTTONS)
+async def clear_text(query: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    post = data['post']
+    if post.is_empty():
+        await answer(query, "Пост пустой.", reply_markup=(await create_write_keyboard(state)).as_markup())
+        return
+    await state.set_state(buttonsState)
+    await state.set_data(data)
+    await answer(query, "❓Как добавить URL кнопки\n\nПример:\n```\nПервый сайт - https://ya.ru | Второй сайт - https://yandex.ru\nСайт университета - https://bmstu.ru\n```\n\nИли напишите /cancel - для отмены\n\n/clear - для удаление существующих кнопок")
+
+@dp.message(buttonsState, Command('cancel'))
+async def publish_command(message: Message, state: FSMContext):
+    data = await state.get_data()
+    post: Post = data['post']
+    await state.set_state(postState)
+    await state.set_data(data)
+    await post.send(message.chat.id, buttons=await create_write_keyboard(state))
+
+@dp.message(buttonsState, Command('clear'))
+async def publish_command(message: Message, state: FSMContext):
+    data = await state.get_data()
+    post: Post = data['post']
+    post.buttons = []
+    await state.set_state(postState)
+    await state.set_data(data)
+    await post.send(message.chat.id, buttons=await create_write_keyboard(state))
+
+@dp.message(buttonsState, F.text)
+async def publish_command(message: Message, state: FSMContext):
+    data = await state.get_data()
+    post: Post = data['post']
+    post.buttons = []
+    for row in message.text.splitlines():
+        post.buttons.append([ (x.split('-')[0].strip(), x.split('-')[1].strip()) for x in row.split('|') ])
+    await state.set_state(postState)
+    await state.set_data(data)
+    await post.send(message.chat.id, buttons=await create_write_keyboard(state))
 
 @dp.message(F.text, postState)
 async def handle_text(message: Message, state: FSMContext):
